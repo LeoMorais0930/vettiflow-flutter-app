@@ -59,6 +59,9 @@ class MemoryDatabase:
     def request(self, key):
         return deepcopy(self.journal.get(key))
 
+    def result(self, key):
+        return self.request(key)
+
     def save_request(self, key, fingerprint, result):
         self.journal[key] = {'fingerprint': fingerprint, 'result': deepcopy(result)}
 
@@ -237,5 +240,20 @@ def test_rejects_invalid_quantities(db, value):
 def test_wrong_database_never_writes(db):
     db.identity = 'VettiP12'
     with pytest.raises(ValueError):
+        run(db)
+    assert not db.rows('SC2')
+
+
+def test_last_stock_issue_transfers_exact_remaining_value(db):
+    row = next(r for r in db.tables['SB2'] if r['B2_COD'] == 'MP1' and r['B2_LOCAL'] == '01')
+    row.update(B2_QATU=3, B2_CM1=Decimal('0.333333'), B2_VATU1=1)
+    run(db, 'transferir', 'last', produtoTransferido='MP1', quantidadeTransferida=3, origem='01', destino='05')
+    assert balance(db, local='01')['B2_VATU1'] == 0
+    assert balance(db)['B2_VATU1'] == 301
+
+
+def test_self_component_is_rejected_without_intermediate_expansion(db):
+    db.tables['SG1'][0]['G1_COMP'] = 'PA1'
+    with pytest.raises(ValueError, match='ciclo'):
         run(db)
     assert not db.rows('SC2')

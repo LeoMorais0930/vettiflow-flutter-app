@@ -7,8 +7,48 @@ import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/data/repositories/sql_production_repository.dart';
 import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
 import 'package:vetti_flow_1_0/ui/production/sql_production_page.dart';
+import 'package:vetti_flow_1_0/shared/models/operator_access.dart';
+import 'package:vetti_flow_1_0/data/repositories/local_json_persistence.dart';
+
+class BrokenPersistence extends LocalJsonPersistence {
+  const BrokenPersistence() : super('test-only');
+  @override
+  String? read() => null;
+  @override
+  void write(String payload) {}
+}
 
 void main() {
+  test('production manager can enter the SQL route', () {
+    final assignments = OperatorAssignmentStore()..authenticate('tatiane', '1001');
+    expect(assignments.currentOperator!.canAccessRoute('/producao/sql-dev'), isTrue);
+  });
+
+  test('failed durable storage prevents a network write', () async {
+    var calls = 0;
+    final repository = SqlProductionRepository(baseUrl: 'http://api.local',
+      persistence: const BrokenPersistence(), client: MockClient((_) async {
+        calls++;
+        return http.Response('{"id":"x","status":"aplicada"}', 200);
+      }));
+    await expectLater(repository.send({'id': 'x'}, writeKey: 'key'), throwsA(isA<SqlProductionException>()));
+    expect(calls, 0);
+    repository.close();
+  });
+
+  test('uncertain request survives retry with an incorrect key', () async {
+    var calls = 0;
+    final repository = SqlProductionRepository(baseUrl: 'http://api.local', client: MockClient((_) async {
+      if (++calls == 1) throw http.ClientException('connection lost after commit');
+      return http.Response('{"detail":"Invalid key"}', 401);
+    }));
+    final body = {'id': 'uncertain'};
+    await expectLater(repository.send(body, writeKey: 'key'), throwsA(isA<http.ClientException>()));
+    await expectLater(repository.send(body, writeKey: 'wrong'), throwsA(isA<SqlProductionException>()));
+    expect(repository.pending, body);
+    await expectLater(repository.send({'id': 'another'}, writeKey: 'key'), throwsA(isA<SqlProductionException>()));
+    repository.close();
+  });
   test('preview and apply preserve the request ID and use a separate write key', () async {
     final requests = <http.Request>[];
     final repository = SqlProductionRepository(

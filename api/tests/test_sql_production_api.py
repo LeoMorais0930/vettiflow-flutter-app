@@ -83,3 +83,17 @@ def test_status_describes_distinct_operations(client):
     assert status['enabled'] is True
     assert status['operations'] == ['abrir', 'alterar', 'transferir', 'apontar']
     assert status['database'] == 'HMLp12'
+
+
+def test_committed_request_can_be_retried_on_the_next_day(client, db, monkeypatch):
+    payload = body()
+    first = client.post(URL, json=payload, headers=HEADERS)
+    module = importlib.import_module('app.sql_production_api')
+    class Tomorrow(date):
+        @classmethod
+        def today(cls):
+            return date.today() + timedelta(days=1)
+    monkeypatch.setattr(module, 'date', Tomorrow)
+    replay = client.post(URL, json=payload, headers=HEADERS)
+    assert replay.status_code == 200 and replay.json() == first.json()
+    assert len(db.rows('SC2')) == 1

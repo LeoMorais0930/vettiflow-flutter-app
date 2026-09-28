@@ -27,6 +27,14 @@ class MemoryPersistence extends LocalJsonPersistence {
   void write(String payload) => value = payload;
 }
 
+class FailingReceiptPersistence extends MemoryPersistence {
+  int writes = 0;
+  @override
+  void write(String payload) {
+    if (++writes == 1) super.write(payload);
+  }
+}
+
 Future<void> mountSqlPage(
   WidgetTester tester,
   SqlProductionRepository repository,
@@ -50,6 +58,15 @@ Future<void> mountSqlPage(
 }
 
 void main() {
+  test('receipt storage failure keeps the original request recoverable', () async {
+    final storage = FailingReceiptPersistence();
+    final repository = SqlProductionRepository(baseUrl: 'http://api.local', persistence: storage,
+      client: MockClient((_) async => http.Response('{"id":"receipt","status":"aplicada"}', 200)));
+    await expectLater(repository.send({'id': 'receipt'}, writeKey: 'key'), throwsA(isA<SqlProductionException>()));
+    expect(repository.pending, {'id': 'receipt'});
+    expect(repository.savedResult('receipt'), isNull);
+    repository.close();
+  });
   test(
     'restart restores an uncertain request and consultation persists the receipt',
     () async {

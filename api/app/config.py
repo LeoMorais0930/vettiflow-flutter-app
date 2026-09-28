@@ -53,7 +53,7 @@ FILIAL_PADRAO = os.getenv("VF_FILIAL", "04")
 PROTHEUS_COMPANY_GROUP = os.getenv("VF_PROTHEUS_COMPANY_GROUP", "01").strip()
 PROTHEUS_REST_URL = os.getenv("VF_PROTHEUS_REST_URL", "").strip().rstrip("/")
 
-# Escrita passa pelo AppServer. A conexão SQL permanece exclusivamente de leitura.
+# Configuração do adapter AppServer legado, independente dos comandos SQL DEV.
 WRITE_ENABLED = os.getenv("VF_WRITE_ENABLED", "false").lower() == "true"
 # Fluxo SQL independente do adapter ADVPL e da fila de rascunhos antiga.
 SQL_WRITE_ENABLED = os.getenv("VF_SQL_WRITE_ENABLED", "false").lower() == "true"

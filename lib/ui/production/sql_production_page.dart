@@ -80,10 +80,11 @@ class _SqlProductionPageState extends State<SqlProductionPage> {
       final status = await _repo.status();
       if (mounted) setState(() => _status = status);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error = 'Não foi possível consultar a conexão de escrita.',
         );
+      }
     }
   }
 
@@ -112,19 +113,22 @@ class _SqlProductionPageState extends State<SqlProductionPage> {
     });
     try {
       final result = await action();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _result = result;
-          if (result['protheusRef'] != null)
+          if (result['protheusRef'] != null) {
             _order.text = result['protheusRef'].toString();
+          }
         });
+      }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error = error is SqlProductionException
               ? error.message
               : 'Resultado não confirmado. Consulte este pedido antes de repetir.',
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -181,9 +185,10 @@ class _SqlProductionPageState extends State<SqlProductionPage> {
       _error = null;
       // A local OP always reuses its opening ID; changes conflict rather than duplicate it.
       if (widget.localOrder case final local?) {
-        if (_operation == 'abrir')
+        if (_operation == 'abrir') {
           _id =
               'abrir:${local.number}:${local.createdAt.microsecondsSinceEpoch}';
+        }
       }
     });
   }

@@ -1,4 +1,4 @@
-"""API read-only do VettiFlow para consultar a base dev do Protheus."""
+"""API VettiFlow: consultas Protheus e comandos SQL explícitos no DEV."""
 
 import logging
 import secrets
@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from . import config, mssql, warehouse_writes
-from .sql_production_api import router as sql_production_router
+from .sql_production_api import router as sql_production_router, status as sql_status
 from .schemas import FinalizarRequest, Health, MutationBatch
 from .warehouse import router as warehouse_router
 from .warehouse_reports import router as warehouse_reports_router
@@ -81,7 +81,9 @@ def health() -> Health:
         ok=True,
         banco=info.get("banco") or config.MSSQL_DATABASE,
         aplicando=False,
-        readOnly=warehouse_writes.readiness(info)["readOnly"],
+        readOnly=warehouse_writes.readiness(info)["readOnly"] and not (
+            sql_status()['enabled'] and str(info.get('banco', '')).lower() == 'hmlp12'
+        ),
         empresa=config.EMPRESA,
     )
 

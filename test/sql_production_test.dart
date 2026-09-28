@@ -18,7 +18,254 @@ class BrokenPersistence extends LocalJsonPersistence {
   void write(String payload) {}
 }
 
+class MemoryPersistence extends LocalJsonPersistence {
+  MemoryPersistence() : super('test-only');
+  String? value;
+  @override
+  String? read() => value;
+  @override
+  void write(String payload) => value = payload;
+}
+
+Future<void> mountSqlPage(
+  WidgetTester tester,
+  SqlProductionRepository repository,
+) async {
+  tester.view.physicalSize = const Size(1200, 1800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  final assignments = OperatorAssignmentStore()
+    ..authenticate('tatiane', '1001');
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: assignments),
+        Provider.value(value: repository),
+      ],
+      child: const MaterialApp(home: SqlProductionPage()),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
+  test(
+    'restart restores an uncertain request and consultation persists the receipt',
+    () async {
+      final storage = MemoryPersistence();
+      final first = SqlProductionRepository(
+        baseUrl: 'http://api.local',
+        persistence: storage,
+        client: MockClient((_) async => throw http.ClientException('timeout')),
+      );
+      await expectLater(
+        first.send({'id': 'restore', 'operacao': 'abrir'}, writeKey: 'secret'),
+        throwsA(isA<http.ClientException>()),
+      );
+      expect(storage.value, isNot(contains('secret')));
+      first.close();
+      final second = SqlProductionRepository(
+        baseUrl: 'http://api.local',
+        persistence: storage,
+        client: MockClient(
+          (_) async =>
+              http.Response('{"id":"restore","status":"aplicada"}', 200),
+        ),
+      );
+      expect(second.pending!['id'], 'restore');
+      await second.consult('restore', writeKey: 'secret');
+      expect(second.pending, isNull);
+      second.close();
+      final third = SqlProductionRepository(
+        baseUrl: 'http://api.local',
+        persistence: storage,
+      );
+      expect(third.savedResult('restore')!['status'], 'aplicada');
+      third.close();
+    },
+  );
+
+  test(
+    'corrupt history and mismatched responses cannot confirm a write',
+    () async {
+      final storage = MemoryPersistence()..value = '{broken';
+      final broken = SqlProductionRepository(
+        baseUrl: 'http://api.local',
+        persistence: storage,
+      );
+      await expectLater(
+        broken.send({'id': 'x'}, writeKey: 'key'),
+        throwsA(isA<SqlProductionException>()),
+      );
+      broken.close();
+      for (final response in [
+        'not JSON',
+        '{"id":"other","status":"aplicada"}',
+      ]) {
+        final repo = SqlProductionRepository(
+          baseUrl: 'http://api.local',
+          client: MockClient((_) async => http.Response(response, 200)),
+        );
+        await expectLater(
+          repo.send({'id': 'x'}, writeKey: 'key'),
+          throwsA(isA<SqlProductionException>()),
+        );
+        expect(repo.pending!['id'], 'x');
+        await expectLater(
+          repo.consult('x', writeKey: 'key'),
+          throwsA(isA<SqlProductionException>()),
+        );
+        repo.close();
+      }
+    },
+  );
+
+  for (final (operation, label) in [
+    ('alterar', 'Alterar quantidade da OP'),
+    ('apontar', 'Apontar produção'),
+    ('transferir', 'Transferir estoque existente'),
+  ]) {
+    testWidgets(
+      '$operation builds the proper command, shows movements and starts another operation',
+      (tester) async {
+        Map<String, dynamic>? sent;
+        final repository = SqlProductionRepository(
+          baseUrl: 'http://api.local',
+          client: MockClient((request) async {
+            if (request.method == 'GET') {
+              return http.Response('{"enabled":true}', 200);
+            }
+            sent = jsonDecode(request.body) as Map<String, dynamic>;
+            return http.Response(
+              jsonEncode({
+                'id': sent!['id'],
+                'status': 'previa',
+                'ordens': [
+                  {'op': 'V0000101001', 'produto': 'PA1', 'quantidade': '1'},
+                ],
+                'empenhos': [
+                  {'produto': 'MP1', 'quantidade': '2', 'local': '05'},
+                ],
+                'movimentos': [
+                  {
+                    'produto': 'PA1',
+                    'quantidade': '1',
+                    'local': '05',
+                    'cf': 'PR0',
+                  },
+                ],
+              }),
+              200,
+            );
+          }),
+        );
+        addTearDown(repository.close);
+        await mountSqlPage(tester, repository);
+        await tester.tap(find.text('Abrir OP'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(label).last);
+        await tester.pumpAndSettle();
+        if (operation == 'transferir') {
+          await tester.enterText(find.byKey(const Key('sql-product')), 'MP1');
+        } else {
+          await tester.enterText(
+            find.widgetWithText(
+              TextFormField,
+              'Referência completa da OP no Protheus',
+            ),
+            'V0000101001',
+          );
+        }
+        await tester.enterText(find.byKey(const Key('sql-write-key')), 'key');
+        await tester.tap(find.text('Conferir operação'));
+        await tester.pumpAndSettle();
+        expect(sent!['operacao'], operation);
+        expect(
+          sent![switch (operation) {
+            'alterar' => 'novaQuantidade',
+            'apontar' => 'quantidadeApontada',
+            _ => 'quantidadeTransferida',
+          }],
+          '1',
+        );
+        expect(find.textContaining('Empenho: MP1'), findsOneWidget);
+        await tester.ensureVisible(find.text('Nova operação'));
+        await tester.tap(find.text('Nova operação'));
+        await tester.pumpAndSettle();
+        expect(find.text('Conferir operação'), findsOneWidget);
+      },
+    );
+  }
+
+  testWidgets(
+    'restored pending operation displays its original data and can be consulted',
+    (tester) async {
+      final storage = MemoryPersistence()
+        ..value = jsonEncode({
+          'pending': {
+            'id': 'recover',
+            'operacao': 'transferir',
+            'produtoTransferido': 'MP1',
+            'quantidadeTransferida': '2',
+            'origem': '01',
+            'destino': '05',
+            'data': '2026-09-28',
+            'autor': 'Tatiane',
+          },
+          'results': {},
+        });
+      final repository = SqlProductionRepository(
+        baseUrl: 'http://api.local',
+        persistence: storage,
+        client: MockClient(
+          (request) async => http.Response(
+            request.url.path.endsWith('/status')
+                ? '{"enabled":true}'
+                : '{"id":"recover","status":"aplicada"}',
+            200,
+          ),
+        ),
+      );
+      addTearDown(repository.close);
+      await mountSqlPage(tester, repository);
+      expect(find.text('Reenviar mesmo pedido'), findsOneWidget);
+      expect(find.text('MP1'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('sql-write-key')), 'key');
+      await tester.tap(find.text('Consultar pedido'));
+      await tester.pumpAndSettle();
+      expect(find.text('Operação registrada no DEV'), findsOneWidget);
+      expect(repository.pending, isNull);
+    },
+  );
+
+  testWidgets(
+    'empty key and failed preview show errors without an apply button',
+    (tester) async {
+      final repository = SqlProductionRepository(
+        baseUrl: 'http://api.local',
+        client: MockClient(
+          (request) async => http.Response(
+            request.method == 'GET'
+                ? '{"enabled":true}'
+                : '{"detail":"Saldo insuficiente"}',
+            request.method == 'GET' ? 200 : 409,
+          ),
+        ),
+      );
+      addTearDown(repository.close);
+      await mountSqlPage(tester, repository);
+      await tester.enterText(find.byKey(const Key('sql-product')), 'PA1');
+      await tester.tap(find.text('Conferir operação'));
+      await tester.pumpAndSettle();
+      expect(find.text('Informe a chave de escrita do DEV.'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('sql-write-key')), 'key');
+      await tester.tap(find.text('Conferir operação'));
+      await tester.pumpAndSettle();
+      expect(find.text('Saldo insuficiente'), findsOneWidget);
+      expect(find.text('Gravar no DEV'), findsNothing);
+    },
+  );
   test('production manager can enter the SQL route', () {
     final assignments = OperatorAssignmentStore()
       ..authenticate('tatiane', '1001');
@@ -51,8 +298,9 @@ void main() {
     final repository = SqlProductionRepository(
       baseUrl: 'http://api.local',
       client: MockClient((_) async {
-        if (++calls == 1)
+        if (++calls == 1) {
           throw http.ClientException('connection lost after commit');
+        }
         return http.Response('{"detail":"Invalid key"}', 401);
       }),
     );

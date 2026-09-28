@@ -174,6 +174,8 @@ class Production:
                     or text(row, 'G1_FIXVAR') not in ('', 'F', 'V')):
                 raise ValueError(f'Estrutura de {code} exige revisão/opcionais/perda/fantasma ainda não mapeados.')
             component = text(row, 'G1_COMP')
+            if text(row, 'G1_LOCCONS') not in ('', '05'):
+                raise ValueError('Estrutura exige consumo em outro armazém não mapeado.')
             if component == code:
                 raise ValueError('A estrutura contém um ciclo de produtos.')
             self.product(component)
@@ -252,6 +254,7 @@ class Production:
         for item in manifest['items']:
             row = next((r for r in actual if r['R_E_C_N_O_'] == item['recno']), None)
             if (not row or text(row, 'D4_COD') != item['code'] or text(row, 'D4_LOCAL') != '05'
+                    or text(row, 'D4_TRT') != item['trt'] or text(row, 'D4_PRODUTO') != manifest['product']
                     or amount(row.get('D4_QUANT')) != amount(item['remaining'])
                     or amount(row.get('D4_QTDEORI')) != amount(item['original'])
                     or any(text(row, k) for k in ('D4_LOTECTL', 'D4_NUMLOTE'))):

@@ -68,7 +68,7 @@ class SqlProductionRepository {
   Map<String, String> _headers([String? writeKey]) => {
     'Content-Type': 'application/json',
     if (apiToken.isNotEmpty) 'X-API-Token': apiToken,
-    if (writeKey != null) 'X-VettiFlow-Write-Key': writeKey,
+    'X-VettiFlow-Write-Key': ?writeKey,
   };
 
   Map<String, dynamic> _decode(http.Response response) {

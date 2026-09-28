@@ -1,7 +1,7 @@
 """Leitura direta da base Protheus dev em SQL Server.
 
-Este módulo é propositalmente read-only. As rotas de gravação continuam fora do
-backend MSSQL até validarmos numeração, RECNO e travas do Protheus real.
+Este módulo concentra consultas. A escrita explícita do DEV fica em
+sql_production.py e sql_production_db.py, desativada por padrão.
 """
 from __future__ import annotations
 

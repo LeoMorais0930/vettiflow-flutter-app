@@ -257,3 +257,18 @@ def test_self_component_is_rejected_without_intermediate_expansion(db):
     with pytest.raises(ValueError, match='ciclo'):
         run(db)
     assert not db.rows('SC2')
+
+
+def test_structure_with_other_consumption_warehouse_is_not_silently_relocated(db):
+    db.tables['SG1'][0]['G1_LOCCONS'] = '03'
+    with pytest.raises(ValueError, match='armazém'):
+        run(db)
+    assert not db.rows('SC2')
+
+
+def test_changed_commitment_traceability_blocks_posting(db):
+    reference = run(db)['protheusRef']
+    db.tables['SD4'][0]['D4_TRT'] = '999'
+    with pytest.raises(ValueError, match='fora do VettiFlow'):
+        run(db, 'apontar', 'post', op=reference, quantidadeApontada=1)
+    assert not db.rows('SD3')

@@ -97,3 +97,9 @@ def test_committed_request_can_be_retried_on_the_next_day(client, db, monkeypatc
     replay = client.post(URL, json=payload, headers=HEADERS)
     assert replay.status_code == 200 and replay.json() == first.json()
     assert len(db.rows('SC2')) == 1
+
+
+def test_health_does_not_claim_read_only_when_sql_is_enabled(client, monkeypatch):
+    from app import mssql
+    monkeypatch.setattr(mssql, 'health', lambda: {'banco': 'HMLp12'})
+    assert client.get('/api/v1/health').json()['readOnly'] is False

@@ -58,15 +58,27 @@ Future<void> mountSqlPage(
 }
 
 void main() {
-  test('receipt storage failure keeps the original request recoverable', () async {
-    final storage = FailingReceiptPersistence();
-    final repository = SqlProductionRepository(baseUrl: 'http://api.local', persistence: storage,
-      client: MockClient((_) async => http.Response('{"id":"receipt","status":"aplicada"}', 200)));
-    await expectLater(repository.send({'id': 'receipt'}, writeKey: 'key'), throwsA(isA<SqlProductionException>()));
-    expect(repository.pending, {'id': 'receipt'});
-    expect(repository.savedResult('receipt'), isNull);
-    repository.close();
-  });
+  test(
+    'receipt storage failure keeps the original request recoverable',
+    () async {
+      final storage = FailingReceiptPersistence();
+      final repository = SqlProductionRepository(
+        baseUrl: 'http://api.local',
+        persistence: storage,
+        client: MockClient(
+          (_) async =>
+              http.Response('{"id":"receipt","status":"aplicada"}', 200),
+        ),
+      );
+      await expectLater(
+        repository.send({'id': 'receipt'}, writeKey: 'key'),
+        throwsA(isA<SqlProductionException>()),
+      );
+      expect(repository.pending, {'id': 'receipt'});
+      expect(repository.savedResult('receipt'), isNull);
+      repository.close();
+    },
+  );
   test(
     'restart restores an uncertain request and consultation persists the receipt',
     () async {

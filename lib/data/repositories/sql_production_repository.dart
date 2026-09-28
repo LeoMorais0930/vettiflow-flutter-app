@@ -140,9 +140,7 @@ class SqlProductionRepository {
       );
     }
     if (data['status'] == 'aplicada') {
-      _results[body['id'] as String] = data;
-      _pending = null;
-      _save();
+      _rememberApplied(body['id'] as String, data);
     }
     return data;
   }
@@ -164,10 +162,26 @@ class SqlProductionRepository {
         'Resposta não confirma a aplicação deste pedido.',
       );
     }
+    _rememberApplied(id, data);
+    return data;
+  }
+
+  void _rememberApplied(String id, Map<String, dynamic> data) {
+    final previousPending = _pending;
+    final previousResult = _results[id];
     _results[id] = data;
     if (_pending?['id'] == id) _pending = null;
-    _save();
-    return data;
+    try {
+      _save();
+    } catch (_) {
+      _pending = previousPending;
+      if (previousResult == null) {
+        _results.remove(id);
+      } else {
+        _results[id] = previousResult;
+      }
+      rethrow;
+    }
   }
 
   void close() => _client.close();

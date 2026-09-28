@@ -1,7 +1,7 @@
 # VettiFlow Flutter App
 
 Aplicativo Flutter para acompanhar os setores da Vetti e consultar o Protheus DEV.
-A integração com o ERP é somente leitura. As operações locais do app continuam separadas dos documentos oficiais.
+A integração consulta o ERP e oferece [comandos SQL de produção no DEV](docs/desenvolvimento/sql-producao-dev.md), desativados por padrão. As etapas locais continuam separadas dos documentos oficiais; gravações exigem envio explícito pela tela de produção.
 
 ## Documentação
 

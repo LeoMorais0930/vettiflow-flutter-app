@@ -1,7 +1,7 @@
 # VettiFlow API Protheus Dev
 
-API interna read-only para o VettiFlow consultar a base dev do Protheus no SQL
-Server.
+API interna para consultas Protheus e comandos explícitos de produção via SQL
+Server no DEV. A escrita SQL é desativada por padrão.
 
 ## Base Atual
 
@@ -12,12 +12,20 @@ Server.
 - Empresa: `010`
 - Filial padrao: `04`
 
-As rotas de escrita continuam bloqueadas com `503`. Por enquanto esta API le
+As rotas legadas de sincronização continuam bloqueadas com `503`. Esta API lê
 produtos, estrutura, saldos, OPs abertas, empenhos, movimentos oficiais de OP,
 transferencias oficiais entre locais, desmontagens oficiais e auditoria de
 movimentos especiais de estoque, alem de previa read-only de apontamento.
 Tambem expoe governanca de escrita futura por `GET /api/v1/write-readiness`,
-sempre com `writeEnabled=false`.
+referente ao adapter AppServer, separado do módulo SQL.
+
+O módulo `GET /api/v1/dev/producao-sql/status`,
+`POST /api/v1/dev/producao-sql/comandos` e
+`GET /api/v1/dev/producao-sql/comandos/{id}` implementa abertura, alteração,
+transferência e apontamento. Exige `X-VettiFlow-Write-Key` além do token de
+consulta. Veja [instalação, limites e validação SQL DEV](../docs/desenvolvimento/sql-producao-dev.md).
+O `/health.readOnly` considera ambos os caminhos de escrita; disponibilidade
+configurada não confirma migração instalada nem homologação no ERP.
 
 O almoxarifado também consulta histórico, estoque, OPs e inventários. Datas omitidas abrangem todo o período, com até 100 registros por página.
 

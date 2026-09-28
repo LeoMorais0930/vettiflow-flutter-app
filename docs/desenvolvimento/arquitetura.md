@@ -1,10 +1,11 @@
 # Arquitetura atual
 
-Referência: 25/09/2026.
+Referência: 28/09/2026.
 
 ```text
 Flutter ── consultas HTTP com token ── FastAPI ── SELECT ── SQL Server DEV
    └──── fluxo operacional local (separado dos documentos oficiais)
+   └──── comandos explícitos + chave de escrita ── transação SQL DEV
 ```
 
 ## Componentes
@@ -16,6 +17,7 @@ Flutter ── consultas HTTP com token ── FastAPI ── SELECT ── SQL 
 | Painel | FlowOpRepository + DashboardCubit | Projeta o fluxo local na gestão |
 | Operação | ProductionFlowStore | Etapas, tempos, defeitos e quantidades locais |
 | Consulta ERP | api/app/main.py, mssql.py, warehouse.py | Leitura parametrizada |
+| Escrita SQL DEV | sql_production.py, sql_production_db.py, sql_production_api.py | Abertura, alteração, transferência e apontamento; desligada por padrão |
 | Interface comum | VettiTopBar, AppColors, AppTheme | Identidade visual |
 
 ## Persistência
@@ -41,7 +43,7 @@ Não há alteração de índice, estrutura ou configuração no Protheus.
 - Preservação de decimais nos modelos antigos de produção.
 - O pareamento antigo de transferências fora do módulo novo ainda precisa cobrir troca de código.
 - Conciliar o fluxo local de entregas, reparos, materiais, despachos e retornos com OPs/documentos oficiais. O protótipo antigo de suporte fica fora das rotas; os novos eventos persistem no navegador.
-- Integração de escrita ainda não concluída. A [pesquisa atual](integracao-sem-api-totvs-2026-09-28.md) avalia rotinas ADVPL e limitações de SQL direto; não descreve uma implementação já disponível.
+- Homologação do [fluxo SQL DEV](sql-producao-dev.md) no SQL Server e no SmartClient. A implementação tem testes isolados; ainda não foi executada contra as tabelas reais. A pesquisa ADVPL permanece como referência, não como garantia de equivalência ao ExecAuto.
 
 ## Validação
 

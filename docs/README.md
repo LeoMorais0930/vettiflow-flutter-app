@@ -24,6 +24,7 @@ Atualizado em 28/09/2026. Os guias descrevem o código atual, inclusive o que ai
 - [Regras oficiais e contratos do Protheus](pesquisa_protheus_2026-09-24/regras_oficiais_e_contratos.md).
 - [Integração sem API pronta da TOTVS](desenvolvimento/integracao-sem-api-totvs-2026-09-28.md).
 - [Preparação de escrita DEV](desenvolvimento/escrita-dev.md).
+- [Produção via SQL DEV: implementação e ativação](desenvolvimento/sql-producao-dev.md).
 - [Validação, testes e pendências](desenvolvimento/validacao.md).
 
 

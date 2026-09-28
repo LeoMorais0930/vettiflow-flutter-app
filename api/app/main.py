@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 from . import config, mssql, warehouse_writes
 from .sql_production_api import router as sql_production_router, status as sql_status
+from .solicitacoes import router as solicitacoes_router
 from .schemas import FinalizarRequest, Health, MutationBatch
 from .warehouse import router as warehouse_router
 from .warehouse_reports import router as warehouse_reports_router
@@ -38,6 +39,7 @@ app.include_router(warehouse_router)
 app.include_router(warehouse_reports_router)
 app.include_router(warehouse_writes.router)
 app.include_router(sql_production_router)
+app.include_router(solicitacoes_router)
 
 
 @app.middleware("http")

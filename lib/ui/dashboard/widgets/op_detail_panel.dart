@@ -554,12 +554,44 @@ class _CompletionPreviewCard extends StatefulWidget {
 class _CompletionPreviewCardState extends State<_CompletionPreviewCard> {
   Future<ProtheusCompletionPreviewSnapshot>? _future;
 
+  /// Armazem do acabado. Como na MATA250: vem sugerido e aceita edicao.
+  final _armazem = TextEditingController();
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _future ??= context
+    _future ??= _simular();
+  }
+
+  @override
+  void dispose() {
+    _armazem.dispose();
+    super.dispose();
+  }
+
+  Future<ProtheusCompletionPreviewSnapshot>? _simular([String? armazem]) {
+    return context
         .read<ProtheusCompletionPreviewRepository?>()
-        ?.fetchPreview(widget.op.numero, quantidade: widget.op.qtd);
+        ?.fetchPreview(
+          widget.op.numero,
+          quantidade: widget.op.qtd,
+          armazem: armazem,
+        )
+        .then((data) {
+          if (mounted) {
+            _armazem.text = data.armazemInformado.isNotEmpty
+                ? data.armazemInformado
+                : data.armazemPadrao;
+          }
+          return data;
+        });
+  }
+
+  void _resimular(String? armazem) {
+    final future = _simular(armazem);
+    setState(() {
+      _future = future;
+    });
   }
 
   @override
@@ -622,6 +654,16 @@ class _CompletionPreviewCardState extends State<_CompletionPreviewCard> {
                   ],
                 ),
                 const SizedBox(height: 10),
+                _FinishedWarehouseField(
+                  controller: _armazem,
+                  padrao: data.armazemPadrao,
+                  editado:
+                      data.armazemInformado.isNotEmpty &&
+                      data.armazemInformado != data.armazemPadrao,
+                  onSimular: () => _resimular(_armazem.text),
+                  onRestaurar: () => _resimular(null),
+                ),
+                const SizedBox(height: 10),
                 for (final movement in data.movimentosPrevistos) ...[
                   _CompletionPreviewMovementRow(movement: movement),
                   const SizedBox(height: 8),
@@ -643,6 +685,72 @@ class _CompletionPreviewCardState extends State<_CompletionPreviewCard> {
           ),
         );
       },
+    );
+  }
+}
+
+class _FinishedWarehouseField extends StatelessWidget {
+  const _FinishedWarehouseField({
+    required this.controller,
+    required this.padrao,
+    required this.editado,
+    required this.onSimular,
+    required this.onRestaurar,
+  });
+
+  final TextEditingController controller;
+  final String padrao;
+  final bool editado;
+  final VoidCallback onSimular;
+  final VoidCallback onRestaurar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        const Text(
+          'Armazem do acabado',
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textStrong,
+          ),
+        ),
+        SizedBox(
+          width: 64,
+          child: TextField(
+            key: const ValueKey('completion-preview-armazem'),
+            controller: controller,
+            maxLength: 2,
+            textCapitalization: TextCapitalization.characters,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.ibmPlexMono(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: const InputDecoration(
+              counterText: '',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => onSimular(),
+          ),
+        ),
+        TextButton(onPressed: onSimular, child: const Text('Simular')),
+        if (editado)
+          TextButton(
+            onPressed: onRestaurar,
+            child: Text('Voltar ao sugerido ($padrao)'),
+          )
+        else if (padrao.isNotEmpty)
+          Text(
+            'Sugerido pelo Protheus: $padrao',
+            style: const TextStyle(fontSize: 12, color: AppColors.muted),
+          ),
+      ],
     );
   }
 }

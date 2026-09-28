@@ -132,11 +132,13 @@ def apontamento_preview(
     op: str,
     filial: str = config.FILIAL_PADRAO,
     quantidade: float | None = Query(default=None, gt=0),
+    armazem: str | None = Query(default=None, pattern=r"^[A-Za-z0-9]{2}$"),
 ) -> dict:
     return mssql.production_completion_preview(
         op=op,
         filial=filial,
         quantidade=quantidade,
+        armazem=armazem,
     )
 
 

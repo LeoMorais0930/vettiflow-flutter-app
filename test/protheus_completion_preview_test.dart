@@ -43,6 +43,7 @@ void main() {
           );
           expect(request.url.queryParameters['filial'], '04');
           expect(request.url.queryParameters['quantidade'], '50');
+          expect(request.url.queryParameters['armazem'], '10');
           expect(request.headers['X-API-Token'], 'token-teste');
           return http.Response(jsonEncode(_previewJson()), 200);
         }),
@@ -52,6 +53,7 @@ void main() {
         '01621401001',
         filial: '04',
         quantidade: 50,
+        armazem: '10',
       );
 
       expect(snapshot.movimentosPrevistos.first.cf, 'PR0');
@@ -76,11 +78,12 @@ void main() {
       armazem: '05',
     );
 
+    final repository = _FakeCompletionPreviewRepository(
+      ProtheusCompletionPreviewSnapshot.fromJson(_previewJson()),
+    );
     await tester.pumpWidget(
       Provider<ProtheusCompletionPreviewRepository>.value(
-        value: _FakeCompletionPreviewRepository(
-          ProtheusCompletionPreviewSnapshot.fromJson(_previewJson()),
-        ),
+        value: repository,
         child: MaterialApp(
           theme: AppTheme.light,
           home: Scaffold(
@@ -108,6 +111,16 @@ void main() {
     expect(find.textContaining('Local 10'), findsOneWidget);
     expect(find.textContaining('Local 05'), findsOneWidget);
     expect(find.textContaining('Confirmar rotina oficial'), findsWidgets);
+
+    // Armazem do acabado vem sugerido e aceita edicao, como na MATA250.
+    final campo = find.byKey(const ValueKey('completion-preview-armazem'));
+    expect(tester.widget<TextField>(campo).controller!.text, '05');
+    expect(find.text('Sugerido pelo Protheus: 05'), findsOneWidget);
+    await tester.enterText(campo, '10');
+    await tester.ensureVisible(find.text('Simular'));
+    await tester.tap(find.text('Simular'));
+    await tester.pumpAndSettle();
+    expect(repository.armazens, [null, '10']);
   });
 }
 
@@ -119,6 +132,7 @@ Map<String, Object?> _previewJson() => {
   'rotinasCandidatas': ['MATA250', 'MATA680', 'MATA681'],
   'quantidadeSolicitada': 50,
   'quantidadeRestante': 50,
+  'armazemPadrao': '05',
   'ordem': {
     'numero': '01621401001',
     'produto': '575-0863',
@@ -164,19 +178,22 @@ Map<String, Object?> _previewJson() => {
 
 class _FakeCompletionPreviewRepository
     implements ProtheusCompletionPreviewRepository {
-  const _FakeCompletionPreviewRepository(this.snapshot);
+  _FakeCompletionPreviewRepository(this.snapshot);
 
   final ProtheusCompletionPreviewSnapshot snapshot;
+  final List<String?> armazens = [];
 
   @override
   Future<ProtheusCompletionPreviewSnapshot> fetchPreview(
     String op, {
     String filial = '04',
     num? quantidade,
+    String? armazem,
   }) async {
     expect(op, '01621401001');
     expect(filial, '04');
     expect(quantidade, 50);
+    armazens.add(armazem);
     return snapshot;
   }
 }

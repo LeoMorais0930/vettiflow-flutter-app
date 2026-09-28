@@ -1,5 +1,6 @@
 import 'package:vetti_flow_1_0/shared/models/operator_access.dart';
 import 'package:flutter/material.dart';
+import 'sql_production_page.dart';
 import 'dispatch_lifecycle_card.dart';
 import 'package:vetti_flow_1_0/ui/warehouse/warehouse_materials_page.dart';
 import 'package:vetti_flow_1_0/ui/warehouse/request_material_dialog.dart';
@@ -187,6 +188,20 @@ class _ProductionWorkPageState extends State<ProductionWorkPage> {
                                       onPressed: () => setState(() {}),
                                       icon: const Icon(Icons.refresh),
                                     ),
+                                    if (!_incoming &&
+                                        operator.canAccessRoute(
+                                          '/producao/sql-dev',
+                                        ))
+                                      IconButton(
+                                        tooltip: 'Gravar produção no DEV',
+                                        icon: const Icon(
+                                          Icons.storage_outlined,
+                                        ),
+                                        onPressed: () => Navigator.pushNamed(
+                                          context,
+                                          '/producao/sql-dev',
+                                        ),
+                                      ),
                                     MaterialsNavigationButton(
                                       sector:
                                           widget.destinationSector == 'support'
@@ -437,6 +452,20 @@ class _ProductionWorkPageState extends State<ProductionWorkPage> {
           ),
         ),
         Text(order.productLabel),
+        if (operator.canAccessRoute('/producao/sql-dev'))
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              icon: const Icon(Icons.storage_outlined),
+              label: const Text('Registrar OP no DEV'),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => SqlProductionPage(localOrder: order),
+                ),
+              ),
+            ),
+          ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 16,

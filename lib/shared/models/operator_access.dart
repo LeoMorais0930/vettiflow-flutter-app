@@ -61,6 +61,8 @@ extension OperatorAccess on Operator {
         };
 
   bool canAccessRoute(String route) {
+    if (route == '/producao/sql-dev')
+      return isProductionManager || isAdministrator;
     if (route == '/login') return true;
     if (route == '/dashboard') return canOpenDashboard;
     if (route == '/colaboradores') return canManageAssignments;

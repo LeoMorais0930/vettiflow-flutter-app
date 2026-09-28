@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vetti_flow_1_0/ui/production/sql_production_page.dart';
 import 'package:vetti_flow_1_0/ui/shared/widgets/route_access.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vetti_flow_1_0/data/repositories/op_repository.dart';
@@ -46,6 +47,7 @@ Map<String, WidgetBuilder> vettiFlowRoutes() {
     '/smd/apontar': (context) => const SmdWorkPage(),
     '/producao': (context) => const ProductionReadPage(),
     '/producao/operacao': (context) => const ProductionWorkPage(),
+    '/producao/sql-dev': (context) => const SqlProductionPage(),
     '/suporte/operacao': (context) =>
         const ProductionWorkPage(destinationSector: 'support'),
     '/expedicao/operacao': (context) =>

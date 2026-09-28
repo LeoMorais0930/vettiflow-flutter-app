@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vetti_flow_1_0/data/repositories/sql_production_repository.dart';
 import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/app/app_routes.dart';
 import 'package:vetti_flow_1_0/data/repositories/flow_op_repository.dart';
@@ -37,6 +38,16 @@ class VettiFlowApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider<SqlProductionRepository>(
+          create: (_) => SqlProductionRepository(
+            baseUrl: _apiBaseUrl,
+            apiToken: _apiToken,
+            persistence: const LocalJsonPersistence(
+              'vettiflow.sql.production.v1',
+            ),
+          ),
+          dispose: (_, repository) => repository.close(),
+        ),
         Provider<WarehouseReadRepository>(
           create: (_) => WarehouseReadRepository(
             baseUrl: _apiBaseUrl,
@@ -48,7 +59,7 @@ class VettiFlowApp extends StatelessWidget {
           create: (_) => const EmptyProductionFlowDatabase(),
         ),
         // A fila de mutacoes nasce antes do fluxo de producao para guardar
-        // rascunhos locais. O Protheus segue somente leitura.
+        // rascunhos locais. Escrita SQL usa comandos explícitos em tela própria.
         ChangeNotifierProvider<PendingMutationStore>(
           create: (_) => PendingMutationStore(),
         ),

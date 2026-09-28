@@ -5,7 +5,7 @@ import secrets
 from fastapi import APIRouter, Header, HTTPException
 
 from . import config
-from .sql_production import Command, execute
+from .sql_production import Command, StaleDateError, execute
 from .sql_production_db import SqlDatabase, configured
 
 router = APIRouter(prefix='/api/v1/dev/producao-sql', tags=['Produção SQL DEV'])
@@ -40,10 +40,10 @@ def authorize(key):
 @router.post('/comandos')
 def command(payload: Command, x_vettiflow_write_key: str | None = Header(default=None)):
     authorize(x_vettiflow_write_key)
-    if payload.data != date.today():
-        raise HTTPException(422, 'Este fluxo registra somente operações com a data de hoje.')
     try:
-        return execute(SqlDatabase(), payload)
+        return execute(SqlDatabase(), payload, today=date.today())
+    except StaleDateError as exc:
+        raise HTTPException(422, str(exc)) from None
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
     except Exception:
@@ -56,13 +56,7 @@ def result(key: str, x_vettiflow_write_key: str | None = Header(default=None)):
     if not key or len(key) > 100:
         raise HTTPException(422, 'Identificador inválido.')
     try:
-        database = SqlDatabase()
-        # Same abstraction is used by the isolated transactional test database.
-        if hasattr(database, 'result'):
-            saved = database.result(key)
-        else:
-            with database.transaction(preview=True) as session:
-                saved = session.request(key)
+        saved = SqlDatabase().result(key)
     except Exception:
         raise HTTPException(503, 'Não foi possível consultar o resultado da operação.') from None
     if not saved:

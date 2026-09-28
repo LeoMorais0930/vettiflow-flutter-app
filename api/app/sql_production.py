@@ -81,7 +81,11 @@ class Command(BaseModel):
         return self
 
 
-def execute(database, command: Command) -> dict:
+class StaleDateError(ValueError):
+    pass
+
+
+def execute(database, command: Command, today: date | None = None) -> dict:
     payload = command.model_dump(mode='json', exclude={'simular'})
     fingerprint = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
     with database.transaction(preview=command.simular) as session:
@@ -90,6 +94,8 @@ def execute(database, command: Command) -> dict:
             if previous['fingerprint'] != fingerprint:
                 raise ValueError('Este identificador já foi usado com outros dados.')
             return previous['result']
+        if today is not None and command.data != today:
+            raise StaleDateError('Este fluxo registra somente operações com a data de hoje.')
         flow = Production(session, command)
         getattr(flow, command.operacao)()
         result = flow.result
@@ -168,6 +174,8 @@ class Production:
                     or text(row, 'G1_FIXVAR') not in ('', 'F', 'V')):
                 raise ValueError(f'Estrutura de {code} exige revisão/opcionais/perda/fantasma ainda não mapeados.')
             component = text(row, 'G1_COMP')
+            if component == code:
+                raise ValueError('A estrutura contém um ciclo de produtos.')
             self.product(component)
             items.append(dict(code=component, rate=str(positive(row['G1_QUANT'])),
                               fixed=text(row, 'G1_FIXVAR') == 'F', trt=text(row, 'G1_TRT')))
@@ -305,6 +313,13 @@ class Production:
 
     def costs(self, code, local, quantity):
         balance = self.balance(code, local)
+        if quantity == amount(balance.get('B2_QATU')):
+            # Consume the entire carried value on the last issue, including
+            # the residual from rounding average unit costs.
+            values = [amount(balance.get(f'B2_VATU{i}')) for i in range(1, 6)]
+            if any(v < ZERO for v in values):
+                raise ValueError('Valor de estoque negativo não suportado.')
+            return values
         values = [amount(balance.get(f'B2_CM{i}')) for i in range(1, 6)]
         if any(v < ZERO for v in values):
             raise ValueError('Custo médio negativo não suportado.')

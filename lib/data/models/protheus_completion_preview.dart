@@ -7,6 +7,8 @@ class ProtheusCompletionPreviewSnapshot {
     this.rotinasCandidatas = const [],
     required this.quantidadeSolicitada,
     required this.quantidadeRestante,
+    this.armazemPadrao = '',
+    this.armazemInformado = '',
     this.ordem,
     this.movimentosPrevistos = const [],
     this.saldosComponentes = const [],
@@ -21,6 +23,12 @@ class ProtheusCompletionPreviewSnapshot {
   final List<String> rotinasCandidatas;
   final num quantidadeSolicitada;
   final num quantidadeRestante;
+
+  /// Local que a MATA250 sugere para o acabado (editavel na tela).
+  final String armazemPadrao;
+
+  /// Local escolhido pelo usuario na simulacao; vazio = [armazemPadrao].
+  final String armazemInformado;
   final ProtheusCompletionOrder? ordem;
   final List<ProtheusCompletionMovementPreview> movimentosPrevistos;
   final List<ProtheusCompletionComponentBalance> saldosComponentes;
@@ -43,6 +51,8 @@ class ProtheusCompletionPreviewSnapshot {
               .toList(growable: false),
       quantidadeSolicitada: _num(json['quantidadeSolicitada']),
       quantidadeRestante: _num(json['quantidadeRestante']),
+      armazemPadrao: _text(json['armazemPadrao']),
+      armazemInformado: _text(json['armazemInformado']),
       ordem: ordemJson == null
           ? null
           : ProtheusCompletionOrder.fromJson(ordemJson),

@@ -362,8 +362,13 @@ def production_completion_preview(
     op: str,
     filial: str,
     quantidade: float | None = None,
+    armazem: str | None = None,
 ) -> dict[str, Any]:
-    """Previa read-only dos movimentos esperados para apontar uma OP."""
+    """Previa read-only dos movimentos esperados para apontar uma OP.
+
+    `armazem` troca o local de entrada do acabado (PR0), como o campo
+    Armazem da MATA250, que vem preenchido mas aceita edicao.
+    """
     normalized = _normalize_op(op)
     with conexao() as conn:
         ordem = _official_order(conn, normalized, filial)
@@ -391,7 +396,10 @@ def production_completion_preview(
     remaining = max(planned - produced, 0)
     requested = quantidade if quantidade is not None else remaining
     requested = max(float(requested or 0), 0)
-    finished_local = _finished_goods_preview_local(ordem, movimentos)
+    # Igual a MATA250: sugere sempre o C2_LOCAL, mesmo com PR0 anterior.
+    default_local = str(ordem.get("local") or "").strip()
+    chosen_local = (armazem or "").strip().upper()
+    finished_local = chosen_local or default_local
     document = _document_preview_reference(normalized, ordem, movimentos)
 
     preview_movements = [
@@ -431,6 +439,13 @@ def production_completion_preview(
                 f"{balance['saldoAtual']} disponivel, {quantity} previsto."
             )
 
+    if chosen_local and chosen_local not in {
+        str(item.get("code") or "").strip().upper()
+        for item in warehouses(filial)
+    }:
+        divergences.append(
+            f"Armazem {chosen_local} nao cadastrado na NNR da filial {filial}."
+        )
     if ordem.get("encerrada"):
         divergences.append("OP ja encerrada em SC2; apontamento deve ser bloqueado.")
     if remaining and requested > remaining:
@@ -448,6 +463,8 @@ def production_completion_preview(
         "rotinasCandidatas": ["MATA250", "MATA680", "MATA681"],
         "quantidadeSolicitada": requested,
         "quantidadeRestante": remaining,
+        "armazemPadrao": default_local,
+        "armazemInformado": chosen_local,
         "ordem": ordem,
         "movimentosPrevistos": preview_movements,
         "saldosComponentes": component_balances,
@@ -685,20 +702,6 @@ def inventory_audit_movements(
             "operacional e estorno automatico quando CF/TM nao bastarem.",
         ],
     }
-
-
-def _finished_goods_preview_local(
-    ordem: dict[str, Any],
-    movimentos: list[dict[str, Any]],
-) -> str:
-    for movement in movimentos:
-        if (
-            movement.get("cf") == "PR0"
-            and str(movement.get("local") or "").strip()
-            and str(movement.get("estornoRaw") or "").strip().upper() != "S"
-        ):
-            return str(movement.get("local") or "").strip()
-    return str(ordem.get("local") or "").strip()
 
 
 def _component_preview_quantity(

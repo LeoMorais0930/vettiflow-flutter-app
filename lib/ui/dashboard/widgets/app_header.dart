@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
+import 'package:vetti_flow_1_0/ui/shared/widgets/account_menu.dart';
 
 class AppHeader extends StatelessWidget {
   final VoidCallback onNovaOP;
@@ -32,19 +33,13 @@ class AppHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Terça-feira, 24 de junho de 2026',
+                  '${DateTime.now().day.toString().padLeft(2, '0')}/${DateTime.now().month.toString().padLeft(2, '0')}/${DateTime.now().year}',
                   style: TextStyle(fontSize: 12.5, color: AppColors.muted),
                 ),
               ],
             ),
           ),
-          IconButton(
-            tooltip: 'Sair',
-            onPressed: () =>
-                Navigator.of(context).pushReplacementNamed('/login'),
-            icon: const Icon(Icons.logout_rounded),
-            color: AppColors.muted,
-          ),
+          const AccountMenu(),
           const SizedBox(width: 8),
           _NovaOPButton(onPressed: onNovaOP),
         ],

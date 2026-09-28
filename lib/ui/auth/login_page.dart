@@ -1,3 +1,4 @@
+import 'package:vetti_flow_1_0/shared/models/operator_access.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
@@ -41,7 +42,7 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     setState(() => _loginError = null);
-    Navigator.of(context).pushReplacementNamed(op.stage.route);
+    Navigator.of(context).pushReplacementNamed(op.homeRoute);
   }
 
   @override

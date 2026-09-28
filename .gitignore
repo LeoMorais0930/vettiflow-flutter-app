@@ -13,6 +13,18 @@ desktop.ini
 .svn/
 .swiftpm/
 migrate_working_dir/
+.local_pg/
+
+# Local database exports and credentials
+export-protheus-*/
+**/export-protheus-*/
+*.dump
+*.backup
+*.sql.gz
+*.psql
+.env
+.env.*
+!.env.example
 
 # IntelliJ related
 *.iml
@@ -33,6 +45,7 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+/tmp/pdfs/
 
 # Machine-specific — generated with local SDK paths
 android/local.properties

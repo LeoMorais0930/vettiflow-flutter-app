@@ -1,6 +1,7 @@
 /// Etapa de trabalho do operador — define pra qual tela ele é direcionado.
 enum WorkStage {
   dashboard('Dashboard', '/dashboard'),
+  smd('SMD', '/smd'),
   firmware('Gravacao', '/firmware'),
   soldering('Soldagem', '/soldagem'),
   testing('Teste', '/teste'),
@@ -28,6 +29,15 @@ enum WorkArea {
   final String label;
 }
 
+enum OperatorPermission {
+  operation('Somente operação'),
+  consultation('Operação e consultas'),
+  manager('Gestor do setor');
+
+  const OperatorPermission(this.label);
+  final String label;
+}
+
 class Operator {
   const Operator({
     required this.name,
@@ -37,10 +47,13 @@ class Operator {
     required this.stage,
     this.role = 'Operador',
     this.usesAssignedStage = false,
-    this.canManageAssignments = false,
+    bool canManageAssignments = false,
+    this.permission,
     this.area = WorkArea.production,
     this.managesArea,
-  });
+    // Mantém o nome público do parâmetro usado pelo cadastro existente.
+    // ignore: prefer_initializing_formals
+  }) : _canManageAssignments = canManageAssignments;
 
   final String name;
   final String username;
@@ -49,11 +62,21 @@ class Operator {
   final WorkStage stage;
   final String role;
   final bool usesAssignedStage;
-  final bool canManageAssignments;
+  final bool _canManageAssignments;
+  final OperatorPermission? permission;
+  bool get canManageAssignments => permission == null
+      ? _canManageAssignments
+      : permission == OperatorPermission.manager;
+  OperatorPermission get effectivePermission =>
+      permission ??
+      (canManageAssignments
+          ? OperatorPermission.manager
+          : OperatorPermission.operation);
   final WorkArea area;
   final WorkArea? managesArea;
 
-  Operator copyWithStage(WorkStage stage) {
+  Operator copyWithStage(WorkStage stage, {OperatorPermission? permission}) {
+    final access = permission ?? this.permission;
     return Operator(
       name: name,
       username: username,
@@ -62,9 +85,15 @@ class Operator {
       stage: stage,
       role: role,
       usesAssignedStage: usesAssignedStage,
-      canManageAssignments: canManageAssignments,
+      canManageAssignments: _canManageAssignments,
+      permission: access,
       area: area,
-      managesArea: managesArea,
+      managesArea:
+          access == OperatorPermission.manager && area != WorkArea.system
+          ? area
+          : access != null && access != OperatorPermission.manager
+          ? null
+          : managesArea,
     );
   }
 
@@ -131,6 +160,17 @@ class Operator {
       username: 'bruno',
       password: '1004',
       pin: '1004',
+      stage: WorkStage.dashboard,
+      role: 'Gestor do suporte',
+      canManageAssignments: true,
+      area: WorkArea.support,
+      managesArea: WorkArea.support,
+    ),
+    Operator(
+      name: 'Vinicius',
+      username: 'vinicius',
+      password: '1006',
+      pin: '1006',
       stage: WorkStage.dashboard,
       role: 'Gestor do suporte',
       canManageAssignments: true,
@@ -288,7 +328,7 @@ class Operator {
       username: 'paula',
       password: '4001',
       pin: '4001',
-      stage: WorkStage.firmware,
+      stage: WorkStage.smd,
       role: 'SMD',
       area: WorkArea.smd,
       usesAssignedStage: true,
@@ -298,7 +338,7 @@ class Operator {
       username: 'leandro',
       password: '4002',
       pin: '4002',
-      stage: WorkStage.firmware,
+      stage: WorkStage.smd,
       role: 'SMD',
       area: WorkArea.smd,
       usesAssignedStage: true,
@@ -420,6 +460,16 @@ class Operator {
       pin: '2026',
       stage: WorkStage.tv,
       role: 'Painel de TV',
+      area: WorkArea.system,
+    ),
+    Operator(
+      name: 'Admin Master',
+      username: 'admin',
+      password: '9999',
+      pin: '9999',
+      stage: WorkStage.dashboard,
+      role: 'Admin master',
+      canManageAssignments: true,
       area: WorkArea.system,
     ),
   ];

@@ -1,890 +1,98 @@
+import 'package:vetti_flow_1_0/shared/models/operator_access.dart';
 import 'package:flutter/material.dart';
-import 'package:vetti_flow_1_0/shared/layout/app_breakpoints.dart';
+import 'package:provider/provider.dart';
+import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
+import 'package:vetti_flow_1_0/data/repositories/production_flow_store.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
-import 'package:vetti_flow_1_0/ui/shared/widgets/vetti_top_bar.dart';
+import 'package:vetti_flow_1_0/ui/warehouse/warehouse_read_page.dart';
 
-class SupportOrder {
-  const SupportOrder({
-    required this.number,
-    required this.product,
-    required this.defectCode,
-    required this.defect,
-    required this.quantity,
-    required this.origin,
-    required this.status,
-  });
-
-  final String number;
-  final String product;
-  final String defectCode;
-  final String defect;
-  final String quantity;
-  final String origin;
-  final String status;
+class SupportPage extends WarehouseReadPage {
+  const SupportPage({super.key})
+    : super.support(sectorAction: const SupportDefectsButton());
 }
 
-class SupportPage extends StatefulWidget {
-  const SupportPage({super.key});
-
-  @override
-  State<SupportPage> createState() => _SupportPageState();
-}
-
-class _SupportPageState extends State<SupportPage> {
-  final _orders = const [
-    SupportOrder(
-      number: 'OP-00564-345',
-      product: 'CR4 - Controle 4 teclas',
-      defectCode: 'T2',
-      defect: 'Sem resposta',
-      quantity: '12 un',
-      origin: 'Teste',
-      status: 'Aguardando',
-    ),
-    SupportOrder(
-      number: 'OP-00565-112',
-      product: 'Central Vetti Smart',
-      defectCode: 'T7',
-      defect: 'Falha intermitente',
-      quantity: '5 un',
-      origin: 'Teste',
-      status: 'Em conserto',
-    ),
-    SupportOrder(
-      number: 'OP-00566-078',
-      product: 'Modulo RF Vetti One',
-      defectCode: 'T4',
-      defect: 'Consumo alto',
-      quantity: '8 un',
-      origin: 'Teste',
-      status: 'Armazenada',
-    ),
-  ];
-
-  var _selectedIndex = 0;
-  var _conferenceStatus = 'Aguardando';
-
-  SupportOrder get _selectedOrder => _orders[_selectedIndex];
-
-  void _startConference() {
-    setState(() => _conferenceStatus = 'Em conferencia');
-  }
-
-  void _pauseConference() {
-    setState(() => _conferenceStatus = 'Pausada');
-  }
-
-  Future<void> _confirmConference() async {
-    final confirmed = await showSupportConfirmDialog(context, _selectedOrder);
-    if (!mounted || confirmed != true) return;
-    setState(() => _conferenceStatus = 'Confirmada');
-  }
-
-  Future<void> _requestItems() async {
-    await showSupportRequestDialog(context, _selectedOrder);
-  }
+class SupportNavigationButton extends StatelessWidget {
+  const SupportNavigationButton({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final formFactor = constraints.maxWidth >= 1180
-            ? AppFormFactor.expanded
-            : AppBreakpoints.fromWidth(constraints.maxWidth);
-        final isMobile = formFactor != AppFormFactor.expanded;
-
-        if (isMobile) {
-          return _MobileSupportLayout(
-            orders: _orders,
-            selectedIndex: _selectedIndex,
-            conferenceStatus: _conferenceStatus,
-            onSelect: (index) => setState(() => _selectedIndex = index),
-            onStart: _startConference,
-            onPause: _pauseConference,
-            onConfirm: _confirmConference,
-            onRequest: _requestItems,
-          );
-        }
-
-        return _DesktopSupportLayout(
-          orders: _orders,
-          selectedIndex: _selectedIndex,
-          conferenceStatus: _conferenceStatus,
-          onSelect: (index) => setState(() => _selectedIndex = index),
-          onStart: _startConference,
-          onPause: _pauseConference,
-          onConfirm: _confirmConference,
-          onRequest: _requestItems,
-        );
-      },
+    final operator = context.watch<OperatorAssignmentStore?>()?.currentOperator;
+    if (operator?.canView(AppSector.support) != true) {
+      return const SizedBox.shrink();
+    }
+    return TextButton.icon(
+      icon: const Icon(Icons.build_outlined, size: 20),
+      label: const Text('Suporte'),
+      onPressed: () => Navigator.of(context).pushNamed('/suporte'),
     );
   }
 }
 
-class _DesktopSupportLayout extends StatelessWidget {
-  const _DesktopSupportLayout({
-    required this.orders,
-    required this.selectedIndex,
-    required this.conferenceStatus,
-    required this.onSelect,
-    required this.onStart,
-    required this.onPause,
-    required this.onConfirm,
-    required this.onRequest,
-  });
-
-  final List<SupportOrder> orders;
-  final int selectedIndex;
-  final String conferenceStatus;
-  final ValueChanged<int> onSelect;
-  final VoidCallback onStart;
-  final VoidCallback onPause;
-  final VoidCallback onConfirm;
-  final VoidCallback onRequest;
-
-  SupportOrder get selectedOrder => orders[selectedIndex];
+class SupportDefectsButton extends StatelessWidget {
+  const SupportDefectsButton({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.pageBackground,
-      body: Column(
-        children: [
-          const VettiTopBar(
-            title: 'Suporte Tecnico',
-            operatorName: 'Bruno',
-            operatorRole: 'Suporte',
+    final store = context.watch<ProductionFlowStore?>();
+    final records = [
+      for (final order in store?.orders ?? [])
+        for (final defect in order.testDefects)
+          (
+            op: order.number,
+            product: order.productLabel,
+            code: defect.code,
+            title: defect.title,
+            quantity: defect.quantity,
           ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(40, 46, 40, 36),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: AppBreakpoints.maxContentWidth,
-                    minWidth: 1040,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: 390,
-                        child: _SupportQueue(
-                          orders: orders,
-                          selectedIndex: selectedIndex,
-                          onSelect: onSelect,
-                        ),
-                      ),
-                      const SizedBox(width: 72),
-                      Expanded(
-                        child: _SupportDetails(
-                          order: selectedOrder,
-                          conferenceStatus: conferenceStatus,
-                          onStart: onStart,
-                          onPause: onPause,
-                          onConfirm: onConfirm,
-                          onRequest: onRequest,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MobileSupportLayout extends StatelessWidget {
-  const _MobileSupportLayout({
-    required this.orders,
-    required this.selectedIndex,
-    required this.conferenceStatus,
-    required this.onSelect,
-    required this.onStart,
-    required this.onPause,
-    required this.onConfirm,
-    required this.onRequest,
-  });
-
-  final List<SupportOrder> orders;
-  final int selectedIndex;
-  final String conferenceStatus;
-  final ValueChanged<int> onSelect;
-  final VoidCallback onStart;
-  final VoidCallback onPause;
-  final VoidCallback onConfirm;
-  final VoidCallback onRequest;
-
-  SupportOrder get selectedOrder => orders[selectedIndex];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF101820),
-      body: SafeArea(
-        child: Center(
-          child: Container(
-            width: double.infinity,
-            constraints: const BoxConstraints(maxWidth: 430),
-            margin: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.pageBackground,
-              borderRadius: BorderRadius.circular(22),
-            ),
-            clipBehavior: Clip.antiAlias,
+    ];
+    return TextButton.icon(
+      label: const Text('Defeitos da produção'),
+      icon: const Icon(Icons.fact_check_outlined),
+      onPressed: () => showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Defeitos da produção'),
+          content: SizedBox(
+            width: 600,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const VettiTopBar(
-                  title: 'Suporte Tecnico',
-                  operatorName: 'Bruno',
-                  compact: true,
+                const Text(
+                  'Registros locais dos testes. A transferência para o suporte deve ser conferida no histórico do Protheus.',
+                  style: TextStyle(color: AppColors.muted, fontSize: 13),
                 ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(12, 18, 12, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4),
-                          child: _SupportHeader(compact: true),
-                        ),
-                        const SizedBox(height: 18),
-                        for (var i = 0; i < orders.length; i++) ...[
-                          _SupportCard(
-                            order: orders[i],
-                            selected: i == selectedIndex,
-                            compact: true,
-                            onTap: () => onSelect(i),
-                          ),
-                          if (i < orders.length - 1) const SizedBox(height: 12),
-                        ],
-                        const SizedBox(height: 24),
-                        _SupportDefectPanel(order: selectedOrder),
-                        const SizedBox(height: 18),
-                        _SupportActions(
-                          compact: true,
-                          onStart: onStart,
-                          onPause: onPause,
-                          onConfirm: onConfirm,
-                          onRequest: onRequest,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Status: $conferenceStatus',
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+                const SizedBox(height: 16),
+                if (records.isEmpty)
+                  const Text('Nenhum defeito registrado no VettiFlow.')
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: records.length,
+                      separatorBuilder: (_, _) => const Divider(),
+                      itemBuilder: (_, index) {
+                        final record = records[index];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text('OP ${record.op} · ${record.product}'),
+                          subtitle: Text('${record.code} · ${record.title}'),
+                          trailing: Text('${record.quantity} un'),
+                        );
+                      },
                     ),
                   ),
-                ),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SupportQueue extends StatelessWidget {
-  const _SupportQueue({
-    required this.orders,
-    required this.selectedIndex,
-    required this.onSelect,
-  });
-
-  final List<SupportOrder> orders;
-  final int selectedIndex;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SupportHeader(),
-        const SizedBox(height: 38),
-        for (var i = 0; i < orders.length; i++) ...[
-          _SupportCard(
-            order: orders[i],
-            selected: i == selectedIndex,
-            onTap: () => onSelect(i),
-          ),
-          if (i < orders.length - 1) const SizedBox(height: 23),
-        ],
-      ],
-    );
-  }
-}
-
-class _SupportHeader extends StatelessWidget {
-  const _SupportHeader({this.compact = false});
-
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'OPs com defeito',
-          style: TextStyle(
-            color: AppColors.text,
-            fontSize: compact ? 24 : 32,
-            fontWeight: FontWeight.w900,
-            height: 1.1,
-          ),
-        ),
-        SizedBox(height: compact ? 6 : 8),
-        Text(
-          compact
-              ? 'Recebidas do teste.'
-              : 'Recebe OPs que contem defeito apontado pelo teste da producao.',
-          style: TextStyle(color: AppColors.muted, fontSize: compact ? 13 : 16),
-        ),
-      ],
-    );
-  }
-}
-
-class _SupportDetails extends StatelessWidget {
-  const _SupportDetails({
-    required this.order,
-    required this.conferenceStatus,
-    required this.onStart,
-    required this.onPause,
-    required this.onConfirm,
-    required this.onRequest,
-  });
-
-  final SupportOrder order;
-  final String conferenceStatus;
-  final VoidCallback onStart;
-  final VoidCallback onPause;
-  final VoidCallback onConfirm;
-  final VoidCallback onRequest;
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 900),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            order.number,
-            style: const TextStyle(
-              color: AppColors.text,
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            order.product,
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 38),
-          _SupportMetrics(order: order, conferenceStatus: conferenceStatus),
-          const SizedBox(height: 32),
-          _SupportDefectPanel(order: order),
-          const SizedBox(height: 54),
-          const Text(
-            'Acoes da conferencia',
-            style: TextStyle(
-              color: AppColors.text,
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'O suporte confere o defeito, pode requisitar componentes e confirma com PIN.',
-            style: TextStyle(color: AppColors.muted, fontSize: 16),
-          ),
-          const SizedBox(height: 36),
-          _SupportActions(
-            onStart: onStart,
-            onPause: onPause,
-            onConfirm: onConfirm,
-            onRequest: onRequest,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SupportCard extends StatelessWidget {
-  const _SupportCard({
-    required this.order,
-    required this.selected,
-    required this.onTap,
-    this.compact = false,
-  });
-
-  final SupportOrder order;
-  final bool selected;
-  final VoidCallback onTap;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(compact ? 10 : 8);
-
-    return Material(
-      color: selected ? const Color(0xFFEAF7FF) : Colors.white,
-      borderRadius: radius,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: radius,
-        child: Container(
-          width: double.infinity,
-          constraints: BoxConstraints(minHeight: compact ? 118 : 126),
-          padding: EdgeInsets.fromLTRB(
-            compact ? 16 : 20,
-            compact ? 14 : 16,
-            compact ? 16 : 20,
-            compact ? 13 : 14,
-          ),
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
-              width: selected ? 2 : 1,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                order.number,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: compact ? 17 : 22,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              SizedBox(height: compact ? 8 : 10),
-              Text(
-                order.product,
-                maxLines: compact ? 2 : 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: compact ? 13 : 17,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              SizedBox(height: compact ? 10 : 12),
-              Text(
-                '${order.defectCode} ${order.defect} · ${order.quantity}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: AppColors.smallText,
-                  fontSize: compact ? 11 : 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SupportMetrics extends StatelessWidget {
-  const _SupportMetrics({required this.order, required this.conferenceStatus});
-
-  final SupportOrder order;
-  final String conferenceStatus;
-
-  @override
-  Widget build(BuildContext context) {
-    final metrics = [
-      ('Defeito', order.defectCode),
-      ('Recebido', order.quantity),
-      ('Origem', order.origin),
-      ('Conferencia', conferenceStatus),
-    ];
-
-    return Wrap(
-      spacing: 24,
-      runSpacing: 18,
-      children: [
-        for (final metric in metrics)
-          _MetricCard(
-            label: metric.$1,
-            value: metric.$2,
-            wide: metric.$1 == 'Conferencia',
-          ),
-      ],
-    );
-  }
-}
-
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.label,
-    required this.value,
-    required this.wide,
-  });
-
-  final String label;
-  final String value;
-  final bool wide;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: wide ? 205 : 160,
-      constraints: const BoxConstraints(minHeight: 98),
-      padding: const EdgeInsets.fromLTRB(20, 16, 18, 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0xFFE4EDF4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.label,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 9),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 24,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SupportDefectPanel extends StatelessWidget {
-  const _SupportDefectPanel({required this.order});
-
-  final SupportOrder order;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF9EF),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFF4D7A7)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Defeito recebido do teste',
-            style: TextStyle(
-              color: AppColors.text,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${order.defectCode} - ${order.defect}: ${order.quantity}',
-            style: const TextStyle(color: AppColors.orangeText),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Essa quantidade fica armazenada no suporte ate decisao de reparo.',
-            style: TextStyle(color: AppColors.muted),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SupportActions extends StatelessWidget {
-  const _SupportActions({
-    required this.onStart,
-    required this.onPause,
-    required this.onConfirm,
-    required this.onRequest,
-    this.compact = false,
-  });
-
-  final VoidCallback onStart;
-  final VoidCallback onPause;
-  final VoidCallback onConfirm;
-  final VoidCallback onRequest;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    if (compact) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Acoes',
-            style: TextStyle(
-              color: AppColors.text,
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 18),
-          _ActionButton(
-            label: 'Iniciar conferencia',
-            onPressed: onStart,
-            fillColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            width: double.infinity,
-            height: 54,
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _ActionButton(
-                  label: 'Pausar',
-                  onPressed: onPause,
-                  foregroundColor: AppColors.orangeText,
-                  borderColor: AppColors.orange,
-                  height: 54,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: _ActionButton(
-                  label: 'Confirmar',
-                  onPressed: onConfirm,
-                  foregroundColor: AppColors.green,
-                  borderColor: AppColors.green,
-                  height: 54,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _ActionButton(
-            label: 'Fazer requisicao',
-            onPressed: onRequest,
-            foregroundColor: AppColors.primary,
-            borderColor: AppColors.primary,
-            width: double.infinity,
-            height: 54,
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 24,
-          runSpacing: 16,
-          children: [
-            _ActionButton(
-              label: 'Iniciar conferencia',
-              onPressed: onStart,
-              fillColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              width: 270,
-            ),
-            _ActionButton(
-              label: 'Pausar conferencia',
-              onPressed: onPause,
-              foregroundColor: AppColors.orangeText,
-              borderColor: AppColors.orange,
-              width: 270,
-            ),
-            _ActionButton(
-              label: 'Confirmar conferencia',
-              onPressed: onConfirm,
-              foregroundColor: AppColors.green,
-              borderColor: AppColors.green,
-              width: 290,
-            ),
-          ],
-        ),
-        const SizedBox(height: 22),
-        _ActionButton(
-          label: 'Fazer requisicao ao almoxarifado',
-          onPressed: onRequest,
-          foregroundColor: AppColors.primary,
-          borderColor: AppColors.primary,
-          width: 360,
-          height: 62,
-        ),
-      ],
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.label,
-    required this.onPressed,
-    required this.foregroundColor,
-    this.fillColor,
-    this.borderColor,
-    this.width,
-    this.height = 74,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-  final Color foregroundColor;
-  final Color? fillColor;
-  final Color? borderColor;
-  final double? width;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: height,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          backgroundColor: fillColor ?? Colors.white,
-          foregroundColor: foregroundColor,
-          side: BorderSide(
-            color: borderColor ?? fillColor ?? Colors.white,
-            width: 2,
-          ),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-        ),
-        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-      ),
-    );
-  }
-}
-
-Future<bool?> showSupportConfirmDialog(
-  BuildContext context,
-  SupportOrder order,
-) {
-  return showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Confirmar conferencia'),
-      content: SizedBox(
-        width: 520,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${order.number} · ${order.defectCode} ${order.defect}',
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 16),
-            const TextField(
-              minLines: 3,
-              maxLines: 5,
-              decoration: InputDecoration(hintText: 'Observacao opcional'),
-            ),
-            const SizedBox(height: 16),
-            const TextField(
-              decoration: InputDecoration(labelText: 'PIN', hintText: '7777'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fechar'),
             ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancelar'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Confirmar'),
-        ),
-      ],
-    ),
-  );
-}
-
-Future<void> showSupportRequestDialog(
-  BuildContext context,
-  SupportOrder order,
-) {
-  return showDialog<void>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Requisicao ao almoxarifado'),
-      content: SizedBox(
-        width: 520,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${order.number} · ${order.defectCode} ${order.defect}',
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 18),
-            const TextField(
-              decoration: InputDecoration(
-                labelText: 'Item',
-                hintText: 'Ex.: Conector barra 4 vias',
-              ),
-            ),
-            const SizedBox(height: 14),
-            const TextField(
-              decoration: InputDecoration(
-                labelText: 'Quantidade',
-                hintText: 'Ex.: 12 un',
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Enviar requisicao'),
-        ),
-      ],
-    ),
-  );
+    );
+  }
 }

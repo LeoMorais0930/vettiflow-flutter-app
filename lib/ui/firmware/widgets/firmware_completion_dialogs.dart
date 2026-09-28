@@ -1,29 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:vetti_flow_1_0/data/models/production_flow.dart';
 import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
 import 'package:vetti_flow_1_0/shared/models/operator.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
 import 'package:vetti_flow_1_0/ui/firmware/widgets/firmware_models.dart';
 
-Future<List<FirmwareDefect>?> showFirmwareDefectsDialog(BuildContext context) {
+Future<List<DefectRecord>?> showFirmwareDefectsDialog(
+  BuildContext context, {
+  required int maxQuantity,
+}) {
   final compact = MediaQuery.sizeOf(context).width < 720;
 
   if (compact) {
-    return showModalBottomSheet<List<FirmwareDefect>>(
+    return showModalBottomSheet<List<DefectRecord>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const _DefectsSheet(compact: true),
+      builder: (context) =>
+          _DefectsSheet(compact: true, maxQuantity: maxQuantity),
     ).then((v) => v);
   }
 
-  return showDialog<List<FirmwareDefect>>(
+  return showDialog<List<DefectRecord>>(
     context: context,
-    builder: (context) => const Dialog(
-      insetPadding: EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+    builder: (context) => Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
       backgroundColor: Colors.transparent,
-      child: _DefectsSheet(),
+      child: _DefectsSheet(maxQuantity: maxQuantity),
     ),
   );
 }
@@ -32,8 +37,9 @@ Future<List<FirmwareDefect>?> showFirmwareDefectsDialog(BuildContext context) {
 Future<Operator?> showFirmwarePinDialog(
   BuildContext context,
   FirmwareOperation operation, {
-  List<FirmwareDefect> defects = const [],
+  List<DefectRecord> defects = const [],
   WorkStage currentStage = WorkStage.firmware,
+  bool Function(Operator operator)? isOperatorAllowed,
 }) {
   final compact = MediaQuery.sizeOf(context).width < 720;
 
@@ -46,6 +52,7 @@ Future<Operator?> showFirmwarePinDialog(
         operation: operation,
         defects: defects,
         currentStage: currentStage,
+        isOperatorAllowed: isOperatorAllowed,
         compact: true,
       ),
     );
@@ -60,6 +67,7 @@ Future<Operator?> showFirmwarePinDialog(
         operation: operation,
         defects: defects,
         currentStage: currentStage,
+        isOperatorAllowed: isOperatorAllowed,
       ),
     ),
   );
@@ -70,8 +78,9 @@ Future<Operator?> showFirmwarePinDialog(
 // ────────────────────────────────────────────────────────────────────
 
 class _DefectsSheet extends StatefulWidget {
-  const _DefectsSheet({this.compact = false});
+  const _DefectsSheet({required this.maxQuantity, this.compact = false});
 
+  final int maxQuantity;
   final bool compact;
 
   @override
@@ -79,23 +88,54 @@ class _DefectsSheet extends StatefulWidget {
 }
 
 class _DefectsSheetState extends State<_DefectsSheet> {
-  final _selected = <String>{};
+  final _quantities = <String, int>{};
+  final _controllers = <String, TextEditingController>{};
+
+  int get _maxQty => widget.maxQuantity <= 0 ? 1 : widget.maxQuantity;
+
+  @override
+  void dispose() {
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
 
   void _toggle(String code) {
     setState(() {
-      if (_selected.contains(code)) {
-        _selected.remove(code);
+      if (_quantities.containsKey(code)) {
+        _quantities.remove(code);
       } else {
-        _selected.add(code);
+        _quantities[code] = 1;
+        _controllers.putIfAbsent(code, () => TextEditingController()).text =
+            '1';
       }
     });
   }
 
+  void _setQty(String code, int value) {
+    setState(() => _quantities[code] = value.clamp(1, _maxQty));
+  }
+
+  List<DefectRecord> get _records => FirmwareDefect.all
+      .where((defect) => _quantities.containsKey(defect.code))
+      .map(
+        (defect) => DefectRecord(
+          code: defect.code,
+          title: defect.title,
+          quantity: _quantities[defect.code]!,
+        ),
+      )
+      .toList();
+
   @override
   Widget build(BuildContext context) {
-    final selectedDefects = FirmwareDefect.all
-        .where((d) => _selected.contains(d.code))
-        .toList();
+    final selectedDefects = _records;
+    final totalDefects = selectedDefects.fold<int>(
+      0,
+      (sum, defect) => sum + defect.quantity,
+    );
+    final exceedsOrder = totalDefects > _maxQty;
 
     return _ModalSurface(
       compact: widget.compact,
@@ -126,7 +166,7 @@ class _DefectsSheetState extends State<_DefectsSheet> {
               for (final defect in FirmwareDefect.all)
                 _DefectChip(
                   defect: defect,
-                  selected: _selected.contains(defect.code),
+                  selected: _quantities.containsKey(defect.code),
                   onTap: () => _toggle(defect.code),
                 ),
             ],
@@ -145,21 +185,41 @@ class _DefectsSheetState extends State<_DefectsSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${selectedDefects.length} defeito${selectedDefects.length > 1 ? 's' : ''} selecionado${selectedDefects.length > 1 ? 's' : ''}',
+                    'Quantidade por defeito',
                     style: const TextStyle(
                       color: AppColors.orangeText,
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 10),
+                  for (final defect in selectedDefects) ...[
+                    _FirmwareDefectQuantityRow(
+                      code: defect.code,
+                      title: defect.title,
+                      controller: _controllers[defect.code]!,
+                      onChanged: (value) => _setQty(defect.code, value),
+                      onStep: (delta) {
+                        final next = (_quantities[defect.code]! + delta).clamp(
+                          1,
+                          _maxQty,
+                        );
+                        _controllers[defect.code]!.text = '$next';
+                        _setQty(defect.code, next);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Text(
-                    selectedDefects
-                        .map((d) => '${d.code} - ${d.title}')
-                        .join(', '),
-                    style: const TextStyle(
-                      color: AppColors.muted,
+                    exceedsOrder
+                        ? 'Total $totalDefects maior que a quantidade da OP ($_maxQty).'
+                        : 'Total: $totalDefects de $_maxQty un.',
+                    style: TextStyle(
+                      color: exceedsOrder
+                          ? const Color(0xFFD45B5B)
+                          : AppColors.muted,
                       fontSize: 12,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -183,9 +243,13 @@ class _DefectsSheetState extends State<_DefectsSheet> {
                 child: _DialogButton(
                   label: selectedDefects.isEmpty
                       ? 'Continuar sem defeitos'
-                      : 'Continuar com ${selectedDefects.length}',
-                  onPressed: () => Navigator.of(context).pop(selectedDefects),
-                  fillColor: AppColors.green,
+                      : 'Continuar com $totalDefects un',
+                  onPressed: exceedsOrder
+                      ? null
+                      : () => Navigator.of(context).pop(selectedDefects),
+                  fillColor: exceedsOrder
+                      ? const Color(0xFFCBD7E1)
+                      : AppColors.green,
                   foregroundColor: Colors.white,
                 ),
               ),
@@ -259,6 +323,109 @@ class _DefectChip extends StatelessWidget {
   }
 }
 
+class _FirmwareDefectQuantityRow extends StatelessWidget {
+  const _FirmwareDefectQuantityRow({
+    required this.code,
+    required this.title,
+    required this.controller,
+    required this.onChanged,
+    required this.onStep,
+  });
+
+  final String code;
+  final String title;
+  final TextEditingController controller;
+  final ValueChanged<int> onChanged;
+  final ValueChanged<int> onStep;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: const Color(0xFFE3EDF4)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 30,
+            child: Text(
+              code,
+              style: const TextStyle(
+                color: AppColors.orangeText,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.text,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          _FirmwareStepButton(
+            icon: Icons.remove_rounded,
+            onTap: () => onStep(-1),
+          ),
+          SizedBox(
+            width: 50,
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(vertical: 7),
+                border: InputBorder.none,
+              ),
+              onChanged: (value) {
+                final parsed = int.tryParse(value.trim());
+                if (parsed != null) onChanged(parsed);
+              },
+            ),
+          ),
+          _FirmwareStepButton(icon: Icons.add_rounded, onTap: () => onStep(1)),
+        ],
+      ),
+    );
+  }
+}
+
+class _FirmwareStepButton extends StatelessWidget {
+  const _FirmwareStepButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(7),
+      onTap: onTap,
+      child: Container(
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(color: const Color(0xFFD8E6EE)),
+        ),
+        child: Icon(icon, size: 16, color: AppColors.primary),
+      ),
+    );
+  }
+}
+
 // ────────────────────────────────────────────────────────────────────
 // PIN dialog — input de 4 digitos com auto-verificacao
 // ────────────────────────────────────────────────────────────────────
@@ -268,12 +435,14 @@ class _PinSheet extends StatefulWidget {
     required this.operation,
     this.defects = const [],
     this.currentStage = WorkStage.firmware,
+    this.isOperatorAllowed,
     this.compact = false,
   });
 
   final FirmwareOperation operation;
-  final List<FirmwareDefect> defects;
+  final List<DefectRecord> defects;
   final WorkStage currentStage;
+  final bool Function(Operator operator)? isOperatorAllowed;
   final bool compact;
 
   @override
@@ -306,7 +475,10 @@ class _PinSheetState extends State<_PinSheet> {
     setState(() {
       _resolvedOperator = op;
       _invalidPin = op == null;
-      _wrongStage = op != null && op.stage != widget.currentStage;
+      _wrongStage =
+          op != null &&
+          !(widget.isOperatorAllowed?.call(op) ??
+              op.stage == widget.currentStage);
     });
   }
 
@@ -443,7 +615,7 @@ class _PinSheetState extends State<_PinSheet> {
                 border: Border.all(color: const Color(0xFFEFDFBF)),
               ),
               child: Text(
-                'Defeitos: ${widget.defects.map((d) => d.code).join(', ')}',
+                'Defeitos: ${widget.defects.map((d) => '${d.code} (${d.quantity})').join(', ')}',
                 style: const TextStyle(
                   color: AppColors.orangeText,
                   fontSize: 12,

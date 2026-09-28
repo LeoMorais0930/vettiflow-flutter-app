@@ -1,6 +1,9 @@
 import 'package:vetti_flow_1_0/data/models/ordem_producao.dart';
+import 'package:vetti_flow_1_0/data/models/protheus_product_lookup.dart';
+import 'package:vetti_flow_1_0/data/models/production_flow.dart';
 import 'package:vetti_flow_1_0/data/models/responsavel.dart';
 import 'package:vetti_flow_1_0/data/repositories/op_repository.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_order_publisher.dart';
 
 class MockOpRepository implements OpRepository {
   final List<OrdemProducao> _ordens = [
@@ -227,6 +230,9 @@ class MockOpRepository implements OpRepository {
       List.unmodifiable(_armazenadas);
 
   @override
+  ProtheusPublishOutcome? get ultimoEnvioProtheus => null;
+
+  @override
   Future<OrdemProducao> criarOrdem(NovaOrdemDTO dto) async {
     final op = OrdemProducao(
       numero: 'OP-2026-${_nextSeq.toString().padLeft(4, '0')}',
@@ -234,7 +240,7 @@ class MockOpRepository implements OpRepository {
       qtd: dto.qtd,
       responsavel: dto.responsavel,
       dataAbertura: '25/06/2026',
-      prazo: dto.prazo,
+      prazo: dto.prazo ?? '—',
       status: StatusOP.aAbrir,
       progresso: 0,
       mes: 'jun',
@@ -249,6 +255,8 @@ class MockOpRepository implements OpRepository {
   Future<void> avancarStatus(
     String numero, {
     int quantidadeArmazenada = 0,
+    String? operatorName,
+    String? operatorPin,
   }) async {
     final idx = _ordens.indexWhere((o) => o.numero == numero);
     if (idx == -1) return;
@@ -299,7 +307,22 @@ class MockOpRepository implements OpRepository {
   }
 
   @override
-  Future<void> cancelarOrdem(String numero) async {
+  Future<void> atualizarRota(
+    String numero,
+    List<ProductionStage> stages,
+  ) async {
+    final idx = _ordens.indexWhere((o) => o.numero == numero);
+    if (idx == -1) return;
+    _ordens[idx] = _ordens[idx].copyWith(plannedStages: stages);
+  }
+
+  @override
+  Future<void> cancelarOrdem(
+    String numero, {
+    Map<String, String> returnWarehouses = const {},
+    String? operatorName,
+    String? operatorPin,
+  }) async {
     _ordens.removeWhere((o) => o.numero == numero);
   }
 
@@ -309,5 +332,34 @@ class MockOpRepository implements OpRepository {
   @override
   Future<List<String>> fetchProdutos() async {
     return _ordens.map((o) => o.produto).toSet().toList();
+  }
+
+  @override
+  Future<List<ProtheusProduct>> searchProdutos(String query) async {
+    final normalized = query.trim().toLowerCase();
+    return (await fetchProdutos())
+        .where(
+          (produto) =>
+              normalized.isEmpty || produto.toLowerCase().contains(normalized),
+        )
+        .take(12)
+        .map((produto) {
+          final parts = produto.split(' - ');
+          return ProtheusProduct(
+            code: parts.first.trim(),
+            description: parts.length > 1
+                ? parts.sublist(1).join(' - ')
+                : produto,
+            type: '',
+            unit: '',
+            group: '',
+          );
+        })
+        .toList();
+  }
+
+  @override
+  Future<ProtheusProductLookup?> lookupProdutoPorCodigo(String code) async {
+    return null;
   }
 }

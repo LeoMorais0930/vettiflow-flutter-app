@@ -4,7 +4,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/data/models/production_flow.dart';
 import 'package:vetti_flow_1_0/data/repositories/production_flow_store.dart';
+import 'package:vetti_flow_1_0/shared/models/operator.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
+import 'package:vetti_flow_1_0/data/models/warehouse_report.dart';
+import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
 
 /// Aba "Relatórios" do painel de produção.
 ///
@@ -13,19 +16,70 @@ import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
 /// criação/finalização de cada OP. Todos os indicadores são derivados desse
 /// histórico, então a tela reflete o fluxo real de produção em tempo real.
 class ReportsView extends StatelessWidget {
-  const ReportsView({super.key});
+  const ReportsView({super.key, this.visibleArea});
+
+  final WorkArea? visibleArea;
 
   @override
   Widget build(BuildContext context) {
     final orders = context.watch<ProductionFlowStore>().orders;
-    final report = ProductionReport(orders, DateTime.now());
+    final operator = context.watch<OperatorAssignmentStore?>()?.currentOperator;
+    final generalManagement =
+        operator?.canManageAssignments == true && operator?.managesArea == null;
+    final sectors = generalManagement
+        ? ReportSector.values
+        : switch (visibleArea) {
+            WorkArea.warehouse => [ReportSector.warehouse],
+            WorkArea.smd => [ReportSector.smd],
+            WorkArea.support => [ReportSector.support],
+            WorkArea.production => [
+              ReportSector.production,
+              ReportSector.expedition,
+            ],
+            _ => <ReportSector>[],
+          };
+    final report = ProductionReport(
+      orders,
+      DateTime.now(),
+      visibleArea: visibleArea,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (sectors.isNotEmpty) ...[
+          const Text(
+            'Relatórios do Protheus',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final sector in sectors)
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.summarize_outlined, size: 18),
+                  label: Text(
+                    sector == ReportSector.management
+                        ? 'Consolidado geral'
+                        : sector.label,
+                  ),
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed(sector.route),
+                ),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
+        const Text(
+          'VettiFlow · dados locais deste dispositivo',
+          style: TextStyle(color: AppColors.muted, fontSize: 13),
+        ),
+        const SizedBox(height: 10),
         _ReportsHeader(report: report),
         const SizedBox(height: 18),
-        if (orders.isEmpty)
+        if (report.orders.isEmpty)
           const _EmptyReports()
         else ...[
           _SummaryGrid(report: report),
@@ -117,14 +171,20 @@ class OperatorWorkRow {
 
 /// Consolida todos os cálculos de relatório a partir das OPs do store.
 class ProductionReport {
-  ProductionReport(List<ProductionOrderFlow> orders, this.now)
-    : orders = List.of(orders)
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt)) {
+  ProductionReport(
+    List<ProductionOrderFlow> sourceOrders,
+    this.now, {
+    this.visibleArea,
+  }) : orders = sourceOrders.where((order) {
+         if (visibleArea == null) return true;
+         return _orderTouchesArea(order, visibleArea);
+       }).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt)) {
     _compute();
   }
 
   final List<ProductionOrderFlow> orders;
   final DateTime now;
+  final WorkArea? visibleArea;
 
   int totalOrders = 0;
   int finishedOrders = 0;
@@ -159,21 +219,43 @@ class ProductionReport {
   }
 
   List<PauseEventRow> get pauseEvents {
-    final rows = [
-      for (final order in orders)
-        for (final event in order.pauseEvents) PauseEventRow(order, event),
-    ]..sort((a, b) => b.event.createdAt.compareTo(a.event.createdAt));
+    final rows =
+        [
+            for (final order in orders)
+              for (final event in order.pauseEvents)
+                PauseEventRow(order, event),
+          ].where((row) {
+            final area = visibleArea;
+            return area == null || _areaForStage(row.event.stage) == area;
+          }).toList()
+          ..sort((a, b) => b.event.createdAt.compareTo(a.event.createdAt));
     return rows;
   }
 
   List<OperatorWorkRow> get operatorWorkRows {
-    final rows = [
-      for (final order in orders)
-        for (final session in order.operatorSessions)
-          OperatorWorkRow(order, session),
-    ]..sort((a, b) => b.session.startedAt.compareTo(a.session.startedAt));
+    final rows =
+        [
+            for (final order in orders)
+              for (final session in order.operatorSessions)
+                OperatorWorkRow(order, session),
+          ].where((row) {
+            final area = visibleArea;
+            return area == null || _areaForStage(row.session.stage) == area;
+          }).toList()
+          ..sort((a, b) => b.session.startedAt.compareTo(a.session.startedAt));
     return rows;
   }
+
+  List<ProductionStage> get visibleStages {
+    final area = visibleArea;
+    if (area == null) return ProductionStage.productionFlow;
+    return ProductionStage.productionFlow
+        .where((stage) => _areaForStage(stage) == area)
+        .toList();
+  }
+
+  String get averageDurationLabel =>
+      visibleArea == null ? 'Tempo médio de produção' : 'Tempo médio no setor';
 
   Duration get averageProductionDuration => _finishedDurationSamples == 0
       ? Duration.zero
@@ -188,20 +270,25 @@ class ProductionReport {
   void _compute() {
     totalOrders = orders.length;
     for (final order in orders) {
+      if (order.totalStoredQuantity > 0) storedOrders++;
       if (order.isDone) {
         finishedOrders++;
-        if (order.currentStage == ProductionStage.storage) storedOrders++;
         final finished = finishedAt(order);
-        if (finished != null) {
-          _finishedDurationTotal += order.totalElapsed(now);
-          _finishedDurationSamples++;
+        if (finished != null || visibleArea != null) {
+          final elapsed = visibleArea == null
+              ? order.totalElapsed(now)
+              : visibleElapsed(order);
+          if (elapsed != Duration.zero) {
+            _finishedDurationTotal += elapsed;
+            _finishedDurationSamples++;
+          }
         }
       } else {
         inProductionOrders++;
       }
 
       // Tempo por etapa (apenas etapas concluídas contam para a média).
-      for (final stage in ProductionStage.productionFlow) {
+      for (final stage in visibleStages) {
         final timing = order.timings[stage];
         if (timing?.startedAt != null && timing?.completedAt != null) {
           stageStats[stage]!.add(timing!.elapsed(now));
@@ -252,6 +339,14 @@ class ProductionReport {
     final tested = order.timings[ProductionStage.testing]?.completedAt;
     if (tested == null) return null;
     return order.totalDefects;
+  }
+
+  Duration visibleElapsed(ProductionOrderFlow order) {
+    return visibleStages.fold<Duration>(
+      Duration.zero,
+      (total, stage) =>
+          total + (order.timings[stage]?.elapsed(now) ?? Duration.zero),
+    );
   }
 }
 
@@ -376,7 +471,7 @@ class _SummaryGrid extends StatelessWidget {
       ),
       _StatCard(
         icon: Icons.timer_outlined,
-        label: 'Tempo médio de produção',
+        label: report.averageDurationLabel,
         value: report.averageProductionDuration == Duration.zero
             ? '—'
             : formatProductionDuration(report.averageProductionDuration),
@@ -647,7 +742,7 @@ class _StageTimingPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stats = ProductionStage.productionFlow
+    final stats = report.visibleStages
         .map((s) => report.stageStats[s]!)
         .toList();
     final maxAvg = stats.fold<int>(
@@ -756,67 +851,170 @@ class _PauseEventsPanel extends StatelessWidget {
             )
           : Column(
               children: [
-                for (final row in rows)
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: AppColors.borderLight),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            row.order.number,
-                            style: GoogleFonts.ibmPlexMono(
-                              color: AppColors.textCode,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Text(
-                            row.event.operatorName,
-                            style: const TextStyle(
-                              color: AppColors.textStrong,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Text(
-                            '${row.event.stage.label} - ${row.event.reasonLabel}',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            row.event.resumedAt == null
-                                ? 'em pausa: ${formatProductionDuration(row.event.pauseDuration(report.now))}'
-                                : 'pausou ${formatProductionDuration(row.event.pauseDuration(report.now))}',
-                            textAlign: TextAlign.end,
-                            style: const TextStyle(
-                              color: AppColors.muted,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                for (var i = 0; i < rows.length; i++) ...[
+                  _PauseEventItem(row: rows[i], now: report.now),
+                  if (i < rows.length - 1) const SizedBox(height: 10),
+                ],
               ],
             ),
+    );
+  }
+}
+
+class _PauseEventItem extends StatelessWidget {
+  const _PauseEventItem({required this.row, required this.now});
+
+  final PauseEventRow row;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = formatProductionDuration(row.event.pauseDuration(now));
+    final stateLabel = row.event.resumedAt == null ? 'Em pausa' : 'Pausou';
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 520;
+        if (compact) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.bgHeader,
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: AppColors.borderLight),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        row.order.number,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.ibmPlexMono(
+                          color: AppColors.textCode,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      duration,
+                      textAlign: TextAlign.end,
+                      style: GoogleFonts.ibmPlexMono(
+                        color: AppColors.textCode,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  row.event.operatorName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textStrong,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _ReportChip(
+                      label: row.event.stage.label,
+                      color: AppColors.primary,
+                    ),
+                    _ReportChip(
+                      label: row.event.reasonLabel,
+                      color: AppColors.orangeText,
+                    ),
+                    _ReportChip(label: stateLabel, color: AppColors.muted),
+                    if (row.event.producedQuantity > 0)
+                      _ReportChip(
+                        label: '${row.event.producedQuantity} un.',
+                        color: AppColors.green,
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppColors.borderLight)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text(
+                  row.order.number,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.ibmPlexMono(
+                    color: AppColors.textCode,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  row.event.operatorName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textStrong,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  '${row.event.stage.label} - ${row.event.reasonLabel}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  row.event.resumedAt == null
+                      ? 'em pausa: $duration'
+                      : 'pausou $duration',
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -844,80 +1042,14 @@ class _OperatorWorkPanel extends StatelessWidget {
             )
           : Column(
               children: [
-                for (final row in rows)
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: AppColors.borderLight),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            row.order.number,
-                            style: GoogleFonts.ibmPlexMono(
-                              color: AppColors.textCode,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Text(
-                            row.session.operatorName,
-                            style: const TextStyle(
-                              color: AppColors.textStrong,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            row.session.stage.label,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            _sessionStatus(row.session),
-                            style: TextStyle(
-                              color: row.session.isCompleted
-                                  ? AppColors.green
-                                  : row.session.isPaused
-                                  ? AppColors.orangeText
-                                  : AppColors.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            formatProductionDuration(
-                              row.session.workedDuration(report.now),
-                            ),
-                            textAlign: TextAlign.end,
-                            style: GoogleFonts.ibmPlexMono(
-                              color: AppColors.textCode,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                for (var i = 0; i < rows.length; i++) ...[
+                  _OperatorWorkItem(
+                    row: rows[i],
+                    now: report.now,
+                    statusLabel: _sessionStatus(rows[i].session),
                   ),
+                  if (i < rows.length - 1) const SizedBox(height: 10),
+                ],
               ],
             ),
     );
@@ -928,6 +1060,207 @@ class _OperatorWorkPanel extends StatelessWidget {
     if (session.isPaused) return 'pausado';
     return 'rodando';
   }
+}
+
+class _OperatorWorkItem extends StatelessWidget {
+  const _OperatorWorkItem({
+    required this.row,
+    required this.now,
+    required this.statusLabel,
+  });
+
+  final OperatorWorkRow row;
+  final DateTime now;
+  final String statusLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 520;
+        if (compact) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.bgHeader,
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: AppColors.borderLight),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        row.order.number,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.ibmPlexMono(
+                          color: AppColors.textCode,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      formatProductionDuration(row.session.workedDuration(now)),
+                      textAlign: TextAlign.end,
+                      style: GoogleFonts.ibmPlexMono(
+                        color: AppColors.textCode,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  row.session.operatorName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textStrong,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _ReportChip(
+                      label: row.session.stage.label,
+                      color: AppColors.primary,
+                    ),
+                    _ReportChip(
+                      label: statusLabel,
+                      color: _sessionStatusColor(row.session),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppColors.borderLight)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text(
+                  row.order.number,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.ibmPlexMono(
+                    color: AppColors.textCode,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  row.session.operatorName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textStrong,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  row.session.stage.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  statusLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _sessionStatusColor(row.session),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  formatProductionDuration(row.session.workedDuration(now)),
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.ibmPlexMono(
+                    color: AppColors.textCode,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ReportChip extends StatelessWidget {
+  const _ReportChip({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 150),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+Color _sessionStatusColor(ProductionOperatorSession session) {
+  if (session.isCompleted) return AppColors.green;
+  if (session.isPaused) return AppColors.orangeText;
+  return AppColors.primary;
 }
 
 // ---------------------------------------------------------------------------
@@ -1041,35 +1374,50 @@ class _MiniStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.bgHeader,
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            margin: const EdgeInsets.only(right: 7),
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          Text(
-            '$label ',
-            style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
-          ),
-          Text(
-            value,
-            style: GoogleFonts.ibmPlexMono(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textCode,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 180),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.bgHeader,
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              margin: const EdgeInsets.only(right: 7),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
-          ),
-        ],
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.ibmPlexMono(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textCode,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1088,7 +1436,9 @@ class _OrdersDetailPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return _Panel(
       title: 'Detalhamento das OPs',
-      subtitle: 'Criação, finalização, defeitos e tempo de cada etapa',
+      subtitle: report.visibleArea == null
+          ? 'Criação, finalização, defeitos e tempo de cada etapa'
+          : 'Criação, finalização e tempo apenas do setor visível',
       icon: Icons.fact_check_outlined,
       child: Column(
         children: [
@@ -1169,8 +1519,14 @@ class _OrderReportCard extends StatelessWidget {
                 color: finished == null ? AppColors.iconMuted : AppColors.green,
               ),
               _MiniStat(
-                label: 'Tempo total',
-                value: formatProductionDuration(order.totalElapsed(report.now)),
+                label: report.visibleArea == null
+                    ? 'Tempo total'
+                    : 'Tempo no setor',
+                value: formatProductionDuration(
+                  report.visibleArea == null
+                      ? order.totalElapsed(report.now)
+                      : report.visibleElapsed(order),
+                ),
                 color: AppColors.primary,
               ),
               _MiniStat(
@@ -1207,7 +1563,11 @@ class _OrderReportCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 9),
-          _StageTimeline(order: order, now: report.now),
+          _StageTimeline(
+            order: order,
+            now: report.now,
+            stages: report.visibleStages,
+          ),
         ],
       ),
     );
@@ -1215,10 +1575,15 @@ class _OrderReportCard extends StatelessWidget {
 }
 
 class _StageTimeline extends StatelessWidget {
-  const _StageTimeline({required this.order, required this.now});
+  const _StageTimeline({
+    required this.order,
+    required this.now,
+    required this.stages,
+  });
 
   final ProductionOrderFlow order;
   final DateTime now;
+  final List<ProductionStage> stages;
 
   @override
   Widget build(BuildContext context) {
@@ -1226,7 +1591,7 @@ class _StageTimeline extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final stage in ProductionStage.productionFlow)
+        for (final stage in stages)
           _StageChip(stage: stage, timing: order.timings[stage], now: now),
       ],
     );
@@ -1324,6 +1689,34 @@ ProductionStage _reportStage(ProductionOrderFlow order) {
   return inProgress ?? lastCompleted ?? order.currentStage;
 }
 
+bool _orderTouchesArea(ProductionOrderFlow order, WorkArea area) {
+  if (_areaForStage(order.currentStage) == area) return true;
+  for (final stage in order.timings.keys) {
+    if (_areaForStage(stage) == area) return true;
+  }
+  for (final session in order.operatorSessions) {
+    if (_areaForStage(session.stage) == area) return true;
+  }
+  for (final pause in order.pauseEvents) {
+    if (_areaForStage(pause.stage) == area) return true;
+  }
+  return false;
+}
+
+WorkArea _areaForStage(ProductionStage stage) {
+  return switch (stage) {
+    ProductionStage.warehouse => WorkArea.warehouse,
+    ProductionStage.smd => WorkArea.smd,
+    ProductionStage.firmware ||
+    ProductionStage.soldering ||
+    ProductionStage.testing ||
+    ProductionStage.closing ||
+    ProductionStage.expedition ||
+    ProductionStage.storage ||
+    ProductionStage.completed => WorkArea.production,
+  };
+}
+
 class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.order});
 
@@ -1334,7 +1727,7 @@ class _StatusChip extends StatelessWidget {
     final String label;
     final Color color;
     final Color bg;
-    if (order.currentStage == ProductionStage.storage) {
+    if (order.totalStoredQuantity > 0 && order.isDone) {
       label = 'Armazenada';
       color = AppColors.primary;
       bg = AppColors.bgAndamento;

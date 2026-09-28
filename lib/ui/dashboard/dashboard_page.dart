@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:vetti_flow_1_0/data/models/ordem_producao.dart';
+import 'package:vetti_flow_1_0/data/models/production_flow.dart';
 import 'package:vetti_flow_1_0/data/models/responsavel.dart';
+import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
 import 'package:vetti_flow_1_0/data/repositories/production_flow_store.dart';
+import 'package:vetti_flow_1_0/shared/models/operator.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
 import 'package:vetti_flow_1_0/ui/dashboard/cubit/dashboard_cubit.dart';
 import 'package:vetti_flow_1_0/ui/dashboard/cubit/dashboard_state.dart';
@@ -21,6 +24,9 @@ import 'package:vetti_flow_1_0/ui/dashboard/widgets/mobile_bottom_nav.dart';
 import 'package:vetti_flow_1_0/ui/dashboard/widgets/nova_op_dialog.dart';
 import 'package:vetti_flow_1_0/ui/dashboard/widgets/op_detail_panel.dart';
 import 'package:vetti_flow_1_0/ui/dashboard/widgets/sidebar.dart';
+import 'package:vetti_flow_1_0/ui/firmware/widgets/firmware_completion_dialogs.dart';
+import 'package:vetti_flow_1_0/ui/protheus/fila_protheus_page.dart';
+import 'package:vetti_flow_1_0/ui/firmware/widgets/firmware_models.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -54,19 +60,64 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isDesktop = constraints.maxWidth >= 920;
-            if (isDesktop) return _DesktopLayout(constraints: constraints);
-            return _MobileLayout(constraints: constraints);
-          },
+    return BlocListener<DashboardCubit, DashboardState>(
+      listenWhen: (antes, agora) =>
+          antes.protheusAviso != agora.protheusAviso &&
+          agora.protheusAviso.isNotEmpty,
+      listener: (context, state) {
+        _avisarProtheusForaDoAr(context, state.protheusAviso);
+        context.read<DashboardCubit>().limparAvisoProtheus();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isDesktop = constraints.maxWidth >= 920;
+              if (isDesktop) return _DesktopLayout(constraints: constraints);
+              return _MobileLayout(constraints: constraints);
+            },
+          ),
         ),
       ),
     );
   }
+}
+
+/// A OP existe no VettiFlow mas nao no Protheus. Fica longo de proposito: o
+/// operador precisa saber que a SC2/SD4 nao foram gravadas e que ha trabalho
+/// pendente na fila, senao ele segue achando que a OP esta no ERP.
+void _avisarProtheusForaDoAr(BuildContext context, String aviso) {
+  ScaffoldMessenger.of(context)
+    ..clearSnackBars()
+    ..showSnackBar(
+      SnackBar(
+        backgroundColor: AppColors.danger,
+        duration: const Duration(seconds: 12),
+        content: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                aviso,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        action: SnackBarAction(
+          label: 'Ver fila',
+          textColor: Colors.white,
+          onPressed: () =>
+              Navigator.of(context).pushNamed(FilaProtheusPage.rota),
+        ),
+      ),
+    );
 }
 
 class _DesktopLayout extends StatelessWidget {
@@ -77,6 +128,10 @@ class _DesktopLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<DashboardCubit>();
+    final currentOperator = context
+        .watch<OperatorAssignmentStore>()
+        .currentOperator;
+    final currentOperatorName = currentOperator?.name;
 
     return BlocBuilder<DashboardCubit, DashboardState>(
       builder: (context, state) {
@@ -98,11 +153,23 @@ class _DesktopLayout extends StatelessWidget {
                             resultText: state.armazenadasResultText,
                           ),
                           const SizedBox(height: 18),
-                          _buildView(state, cubit),
+                          _buildView(
+                            state,
+                            cubit,
+                            currentOperator?.managesArea,
+                          ),
                         ] else if (state.viewMode == ViewMode.relatorios) ...[
-                          _buildView(state, cubit),
+                          _buildView(
+                            state,
+                            cubit,
+                            currentOperator?.managesArea,
+                          ),
                         ] else if (state.viewMode == ViewMode.responsaveis) ...[
-                          _buildView(state, cubit),
+                          _buildView(
+                            state,
+                            cubit,
+                            currentOperator?.managesArea,
+                          ),
                         ] else ...[
                           KpiCards(
                             counts: state.kpiCounts,
@@ -131,7 +198,11 @@ class _DesktopLayout extends StatelessWidget {
                             onLimpar: cubit.limparFiltros,
                           ),
                           const SizedBox(height: 18),
-                          _buildView(state, cubit),
+                          _buildView(
+                            state,
+                            cubit,
+                            currentOperator?.managesArea,
+                          ),
                         ],
                       ],
                     ),
@@ -150,28 +221,61 @@ class _DesktopLayout extends StatelessWidget {
                 op: state.selectedOrdem!,
                 confirmCancel: state.confirmCancel,
                 onClose: cubit.closeOP,
-                onAdvance: cubit.advanceOP,
+                onAdvance: ({int quantidadeArmazenada = 0}) =>
+                    _advanceWithSignature(
+                      context,
+                      cubit,
+                      state.selectedOrdem!,
+                      quantidadeArmazenada: quantidadeArmazenada,
+                    ),
+                onUpdateRoute: cubit.updateRoute,
                 onRegress: cubit.regressOP,
                 onAskCancel: cubit.askCancel,
-                onConfirmCancel: cubit.cancelOP,
+                onConfirmCancel: (returnWarehouses, operatorPin) =>
+                    cubit.cancelOP(
+                      returnWarehouses: returnWarehouses,
+                      operatorName: currentOperatorName,
+                      operatorPin: operatorPin,
+                    ),
                 onCancelNo: cubit.cancelCancelation,
                 isDesktop: true,
+                canEdit: _canOperatorEditOrder(
+                  currentOperator,
+                  state.selectedOrdem!,
+                ),
+                showSensitiveDetails: _canOperatorViewSensitiveDetails(
+                  currentOperator,
+                  state.selectedOrdem!,
+                ),
+                readOnlyMessage: _readOnlyMessage(
+                  currentOperator,
+                  state.selectedOrdem!,
+                ),
               ),
             if (state.novaOPOpen)
               NovaOpDialog(
                 produtos: state.produtos,
                 responsaveis: state.responsaveis.map((r) => r.nome).toList(),
+                onLookupProduto: cubit.lookupProdutoPorCodigo,
+                onSearchProdutos: cubit.searchProdutos,
+                currentOperatorName: currentOperatorName,
                 onCreate: cubit.createOP,
                 onClose: cubit.closeNovaOP,
                 isDesktop: true,
               ),
+            if (state.databaseSyncing)
+              _DatabaseSyncOverlay(message: state.databaseSyncMessage),
           ],
         );
       },
     );
   }
 
-  Widget _buildView(DashboardState state, DashboardCubit cubit) {
+  Widget _buildView(
+    DashboardState state,
+    DashboardCubit cubit,
+    WorkArea? visibleArea,
+  ) {
     final ordens = state.ordensFiltradas;
     switch (state.viewMode) {
       case ViewMode.kanban:
@@ -185,7 +289,7 @@ class _DesktopLayout extends StatelessWidget {
       case ViewMode.responsaveis:
         return const OperatorAssignmentsView();
       case ViewMode.relatorios:
-        return const ReportsView();
+        return ReportsView(visibleArea: visibleArea);
     }
   }
 }
@@ -198,6 +302,10 @@ class _MobileLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<DashboardCubit>();
+    final currentOperator = context
+        .watch<OperatorAssignmentStore>()
+        .currentOperator;
+    final currentOperatorName = currentOperator?.name;
 
     return BlocBuilder<DashboardCubit, DashboardState>(
       builder: (context, state) {
@@ -206,12 +314,35 @@ class _MobileLayout extends StatelessWidget {
             op: state.selectedOrdem!,
             confirmCancel: state.confirmCancel,
             onClose: cubit.closeOP,
-            onAdvance: cubit.advanceOP,
+            onAdvance: ({int quantidadeArmazenada = 0}) =>
+                _advanceWithSignature(
+                  context,
+                  cubit,
+                  state.selectedOrdem!,
+                  quantidadeArmazenada: quantidadeArmazenada,
+                ),
+            onUpdateRoute: cubit.updateRoute,
             onRegress: cubit.regressOP,
             onAskCancel: cubit.askCancel,
-            onConfirmCancel: cubit.cancelOP,
+            onConfirmCancel: (returnWarehouses, operatorPin) => cubit.cancelOP(
+              returnWarehouses: returnWarehouses,
+              operatorName: currentOperatorName,
+              operatorPin: operatorPin,
+            ),
             onCancelNo: cubit.cancelCancelation,
             isDesktop: false,
+            canEdit: _canOperatorEditOrder(
+              currentOperator,
+              state.selectedOrdem!,
+            ),
+            showSensitiveDetails: _canOperatorViewSensitiveDetails(
+              currentOperator,
+              state.selectedOrdem!,
+            ),
+            readOnlyMessage: _readOnlyMessage(
+              currentOperator,
+              state.selectedOrdem!,
+            ),
           );
         }
 
@@ -227,9 +358,11 @@ class _MobileLayout extends StatelessWidget {
                       children: [
                         const SizedBox(height: 14),
                         if (state.viewMode == ViewMode.relatorios) ...[
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
-                            child: ReportsView(),
+                            child: ReportsView(
+                              visibleArea: currentOperator?.managesArea,
+                            ),
                           ),
                         ] else if (state.viewMode == ViewMode.responsaveis) ...[
                           const Padding(
@@ -406,10 +539,15 @@ class _MobileLayout extends StatelessWidget {
               NovaOpDialog(
                 produtos: state.produtos,
                 responsaveis: state.responsaveis.map((r) => r.nome).toList(),
+                onLookupProduto: cubit.lookupProdutoPorCodigo,
+                onSearchProdutos: cubit.searchProdutos,
+                currentOperatorName: currentOperatorName,
                 onCreate: cubit.createOP,
                 onClose: cubit.closeNovaOP,
                 isDesktop: false,
               ),
+            if (state.databaseSyncing)
+              _DatabaseSyncOverlay(message: state.databaseSyncMessage),
           ],
         );
       },
@@ -429,6 +567,173 @@ class _MobileLayout extends StatelessWidget {
     );
   }
 }
+
+Future<void> _advanceWithSignature(
+  BuildContext context,
+  DashboardCubit cubit,
+  OrdemProducao order, {
+  int quantidadeArmazenada = 0,
+}) async {
+  final signature = await showFirmwarePinDialog(
+    context,
+    FirmwareOperation(
+      number: order.numero,
+      product: order.produto,
+      quantity: order.qtdLabel,
+      origin: order.stage.label,
+      receivedAt: order.dataAbertura,
+      receivedAgo: 'Movimentacao pela dashboard',
+    ),
+    currentStage: _workStageFor(order.stage),
+    isOperatorAllowed: (operator) => _canOperatorEditOrder(operator, order),
+  );
+  if (signature == null) return;
+  try {
+    await cubit.advanceOP(
+      quantidadeArmazenada: quantidadeArmazenada,
+      operatorName: signature.name,
+      operatorPin: signature.pin,
+    );
+  } catch (_) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Não consegui atualizar o banco agora. Tente novamente.'),
+      ),
+    );
+  }
+}
+
+WorkStage _workStageFor(ProductionStage stage) {
+  return switch (stage) {
+    ProductionStage.warehouse => WorkStage.warehouse,
+    ProductionStage.smd => WorkStage.smd,
+    ProductionStage.firmware => WorkStage.firmware,
+    ProductionStage.soldering => WorkStage.soldering,
+    ProductionStage.testing => WorkStage.testing,
+    ProductionStage.closing => WorkStage.closing,
+    ProductionStage.expedition ||
+    ProductionStage.storage ||
+    ProductionStage.completed => WorkStage.expedition,
+  };
+}
+
+class _DatabaseSyncOverlay extends StatelessWidget {
+  const _DatabaseSyncOverlay({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.black.withValues(alpha: 0.48),
+        child: Center(
+          child: Container(
+            width: 380,
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x330F172A),
+                  blurRadius: 28,
+                  offset: Offset(0, 14),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Atualizando bancos',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.text,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message.isEmpty
+                      ? 'Atualizando banco Protheus e VettiFlow.'
+                      : message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+bool _canOperatorEditOrder(Operator? operator, OrdemProducao order) {
+  if (operator == null) return true;
+  if (operator.managesArea == null && operator.canManageAssignments) {
+    return true;
+  }
+  final stage = order.stage;
+  final username = operator.username.trim().toLowerCase();
+  return switch (username) {
+    'tatiane' || 'andressa' => _productionDashboardStages.contains(stage),
+    'vera' => stage == ProductionStage.warehouse,
+    'paula' => stage == ProductionStage.smd,
+    'bruna' || 'tamara' => stage == ProductionStage.expedition,
+    _ => false,
+  };
+}
+
+bool _canOperatorViewSensitiveDetails(Operator? operator, OrdemProducao order) {
+  if (operator == null) return true;
+  if (operator.managesArea == null && operator.canManageAssignments) {
+    return true;
+  }
+  final managedArea = operator.managesArea;
+  if (managedArea == null) return false;
+  return _areaForStage(order.stage) == managedArea;
+}
+
+WorkArea _areaForStage(ProductionStage stage) {
+  return switch (stage) {
+    ProductionStage.warehouse => WorkArea.warehouse,
+    ProductionStage.smd => WorkArea.smd,
+    ProductionStage.firmware ||
+    ProductionStage.soldering ||
+    ProductionStage.testing ||
+    ProductionStage.closing ||
+    ProductionStage.expedition ||
+    ProductionStage.storage ||
+    ProductionStage.completed => WorkArea.production,
+  };
+}
+
+String _readOnlyMessage(Operator? operator, OrdemProducao order) {
+  final name = operator?.name ?? 'Este usuário';
+  return '$name pode acompanhar esta OP em ${order.stage.label}, mas não pode movimentar esta etapa.';
+}
+
+const _productionDashboardStages = {
+  ProductionStage.firmware,
+  ProductionStage.soldering,
+  ProductionStage.testing,
+  ProductionStage.closing,
+  ProductionStage.expedition,
+};
 
 class _StoredHeader extends StatelessWidget {
   const _StoredHeader({required this.resultText, this.compact = false});
@@ -523,18 +828,23 @@ class _MobileOpCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      op.numero,
-                      style: GoogleFonts.ibmPlexMono(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textCode,
-                        letterSpacing: 0.3,
+                    Expanded(
+                      child: Text(
+                        op.numero,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.ibmPlexMono(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textCode,
+                          letterSpacing: 0.3,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
+                      constraints: const BoxConstraints(maxWidth: 118),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 9,
                         vertical: 4,
@@ -555,12 +865,16 @@ class _MobileOpCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 5),
-                          Text(
-                            op.status.shortLabel,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: op.status.textColor,
+                          Flexible(
+                            child: Text(
+                              op.status.shortLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: op.status.textColor,
+                              ),
                             ),
                           ),
                         ],
@@ -579,41 +893,49 @@ class _MobileOpCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        if (resp != null) ...[
-                          Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: resp.cor,
-                              shape: BoxShape.circle,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          if (resp != null) ...[
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: resp.cor,
+                                shape: BoxShape.circle,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                resp.iniciais,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
-                            alignment: Alignment.center,
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
                             child: Text(
-                              resp.iniciais,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w600,
+                              op.responsavel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: AppColors.textMuted,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
                         ],
-                        Text(
-                          op.responsavel,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       op.qtdLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12.5, color: AppColors.muted),
                     ),
                   ],
@@ -662,51 +984,63 @@ class _MobileOpCard extends StatelessWidget {
                     ),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Abertura ${op.dataAbertura}',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: AppColors.textWeak,
+                      Expanded(
+                        child: Text(
+                          'Abertura ${op.dataAbertura}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.textWeak,
+                          ),
                         ),
                       ),
-                      Row(
-                        children: [
-                          Text(
-                            op.prazoLabel,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: op.atrasada
-                                  ? AppColors.danger
-                                  : AppColors.textMuted,
-                              fontWeight: op.atrasada
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                            ),
-                          ),
-                          if (op.atrasada) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.dangerBg,
-                                borderRadius: BorderRadius.circular(99),
-                              ),
-                              child: const Text(
-                                'Atrasada',
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                op.prazoLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.danger,
+                                  fontSize: 11.5,
+                                  color: op.atrasada
+                                      ? AppColors.danger
+                                      : AppColors.textMuted,
+                                  fontWeight: op.atrasada
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
                                 ),
                               ),
                             ),
+                            if (op.atrasada) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.dangerBg,
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                                child: const Text(
+                                  'Atrasada',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.danger,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ],
                   ),
@@ -796,144 +1130,168 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Filtros',
-                  style: GoogleFonts.ibmPlexSans(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.text,
-                  ),
-                ),
-                Material(
-                  color: AppColors.bgButton,
-                  borderRadius: BorderRadius.circular(9),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(9),
-                    onTap: () => Navigator.pop(context),
-                    child: const SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: Center(
-                        child: Text(
-                          '×',
-                          style: TextStyle(
-                            fontSize: 19,
-                            color: AppColors.textMuted,
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Filtros',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.ibmPlexSans(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.text,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Material(
+                      color: AppColors.bgButton,
+                      borderRadius: BorderRadius.circular(9),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(9),
+                        onTap: () => Navigator.pop(context),
+                        child: const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: Center(
+                            child: Text(
+                              '×',
+                              style: TextStyle(
+                                fontSize: 19,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: Column(
-              children: [
-                _SheetDropdown(
-                  label: 'Período',
-                  value: _periodo,
-                  items: const {
-                    'todos': 'Todos os períodos',
-                    'jun': 'Junho 2026',
-                    'mai': 'Maio 2026',
-                  },
-                  onChanged: (v) => setState(() => _periodo = v),
-                ),
-                const SizedBox(height: 15),
-                _SheetDropdown(
-                  label: 'Responsável',
-                  value: _responsavel,
-                  items: {
-                    'todos': 'Todos os responsáveis',
-                    for (final r in widget.state.responsaveis) r.nome: r.nome,
-                  },
-                  onChanged: (v) => setState(() => _responsavel = v),
-                ),
-                const SizedBox(height: 15),
-                _SheetDropdown(
-                  label: 'Produto',
-                  value: _produto,
-                  items: {
-                    'todos': 'Todos os produtos',
-                    for (final p in widget.state.produtos) p: p,
-                  },
-                  onChanged: (v) => setState(() => _produto = v),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
-            child: Row(
-              children: [
-                ElevatedButton(
-                  onPressed: () {
-                    widget.cubit.limparFiltros();
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.bgButton,
-                    foregroundColor: AppColors.textCode,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 13,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Column(
+                  children: [
+                    _SheetDropdown(
+                      label: 'Período',
+                      value: _periodo,
+                      items: const {
+                        'todos': 'Todos os períodos',
+                        'jun': 'Junho 2026',
+                        'mai': 'Maio 2026',
+                      },
+                      onChanged: (v) => setState(() => _periodo = v),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(11),
+                    const SizedBox(height: 15),
+                    _SheetDropdown(
+                      label: 'Responsável',
+                      value: _responsavel,
+                      items: {
+                        'todos': 'Todos os responsáveis',
+                        for (final r in widget.state.responsaveis)
+                          r.nome: r.nome,
+                      },
+                      onChanged: (v) => setState(() => _responsavel = v),
                     ),
-                    textStyle: GoogleFonts.ibmPlexSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                    const SizedBox(height: 15),
+                    _SheetDropdown(
+                      label: 'Produto',
+                      value: _produto,
+                      items: {
+                        'todos': 'Todos os produtos',
+                        for (final p in widget.state.produtos) p: p,
+                      },
+                      onChanged: (v) => setState(() => _produto = v),
                     ),
-                  ),
-                  child: const Text('Limpar'),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      widget.cubit.setFiltroPeriodo(_periodo);
-                      widget.cubit.setFiltroResponsavel(_responsavel);
-                      widget.cubit.setFiltroProduto(_produto);
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(11),
-                      ),
-                      textStyle: GoogleFonts.ibmPlexSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    SizedBox(
+                      width: 116,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          widget.cubit.limparFiltros();
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.bgButton,
+                          foregroundColor: AppColors.textCode,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(11),
+                          ),
+                          textStyle: GoogleFonts.ibmPlexSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        child: const Text(
+                          'Limpar',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
-                    child: const Text('Aplicar'),
-                  ),
+                    SizedBox(
+                      width: 160,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          widget.cubit.setFiltroPeriodo(_periodo);
+                          widget.cubit.setFiltroResponsavel(_responsavel);
+                          widget.cubit.setFiltroProduto(_produto);
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(11),
+                          ),
+                          textStyle: GoogleFonts.ibmPlexSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        child: const Text(
+                          'Aplicar',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -968,6 +1326,7 @@ class _SheetDropdown extends StatelessWidget {
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           initialValue: value,
+          isExpanded: true,
           decoration: InputDecoration(
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(11),
@@ -988,8 +1347,23 @@ class _SheetDropdown extends StatelessWidget {
             fontSize: 14,
             color: AppColors.textStrong,
           ),
+          selectedItemBuilder: (context) => items.entries
+              .map(
+                (e) =>
+                    Text(e.value, maxLines: 1, overflow: TextOverflow.ellipsis),
+              )
+              .toList(),
           items: items.entries
-              .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+              .map(
+                (e) => DropdownMenuItem(
+                  value: e.key,
+                  child: Text(
+                    e.value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
               .toList(),
           onChanged: (v) {
             if (v != null) onChanged(v);

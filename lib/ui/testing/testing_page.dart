@@ -110,6 +110,18 @@ class TestingPage extends StatefulWidget {
 
 class _TestingPageState extends State<TestingPage> {
   var _selectedIndex = 0;
+  bool _initialSelectionApplied = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialSelectionApplied) return;
+    _initialSelectionApplied = true;
+    final number = ModalRoute.of(context)?.settings.arguments;
+    if (number is! String) return;
+    final index = _flowOrders().indexWhere((order) => order.number == number);
+    if (index >= 0) _selectedIndex = index;
+  }
 
   List<ProductionOrderFlow> _flowOrders() => context
       .read<ProductionFlowStore>()
@@ -141,18 +153,24 @@ class _TestingPageState extends State<TestingPage> {
     return TestOperation(
       number: order.number,
       product: order.productLabel,
-      quantity: order.quantityLabel,
-      quantityValue: order.quantity,
-      origin: 'Soldagem',
+      quantity: order.productionQuantityLabel,
+      quantityValue: order.productionQuantity.floor(),
+      origin: order.previousStageLabel,
       receivedAt: _clockLabel(order.updatedAt),
       receivedAgo: order.timings[ProductionStage.testing]?.startedAt == null
           ? 'Aguardando inicio'
           : 'Tempo na etapa: ${formatProductionDuration(elapsed)}',
-      station: order.productCode.contains('SMART')
-          ? 'Bancada T-04'
-          : 'Bancada T-02',
+      station: '',
       checklist: checklist,
-      firmwareDefects: const [],
+      firmwareDefects: order.testDefects
+          .map(
+            (defect) => DefectEntry(
+              code: defect.code,
+              title: defect.title,
+              quantity: '${defect.quantity} un',
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -169,13 +187,13 @@ class _TestingPageState extends State<TestingPage> {
     setState(() => _selectedIndex = index);
   }
 
-  void _startTest() {
+  Future<void> _startTest() async {
     final order = _selectedFlowOrder();
     if (order == null) return;
     final operator = context.read<OperatorAssignmentStore>().currentOperator;
-    context.read<ProductionFlowStore>().startStage(
+    await context.read<ProductionFlowStore>().startStage(
       order.number,
-      operatorName: operator?.name ?? 'Sabrina',
+      operatorName: operator?.name ?? 'Operador',
       operatorPin: operator?.pin,
     );
   }
@@ -186,10 +204,10 @@ class _TestingPageState extends State<TestingPage> {
     final request = await showPauseReasonDialog(
       context,
       stage: ProductionStage.testing,
-      maxQuantity: order.quantity,
+      maxQuantity: order.productionQuantity.floor(),
     );
     if (!mounted || request == null) return;
-    context.read<ProductionFlowStore>().pauseStage(
+    await context.read<ProductionFlowStore>().pauseStage(
       order.number,
       operatorName: request.operatorName,
       operatorPin: request.operatorPin,
@@ -211,16 +229,23 @@ class _TestingPageState extends State<TestingPage> {
       operation,
       defects: defects,
     );
-    if (!mounted || signed != true) return;
+    if (!mounted || signed == null) return;
 
-    context.read<ProductionFlowStore>().completeTesting(
+    await context.read<ProductionFlowStore>().completeTesting(
       flowOrder.number,
       defects: defects,
+      operatorName: signed.name,
+      operatorPin: signed.pin,
     );
-    final totalDefects = defects.fold<int>(0, (sum, d) => sum + d.quantity);
-    final suffix = defects.isEmpty
-        ? 'aprovada para expedicao.'
-        : 'concluida com $totalDefects dispositivo${totalDefects == 1 ? '' : 's'} em defeito.';
+    if (!mounted) return;
+    final current = context.read<ProductionFlowStore>().orders.firstWhere(
+      (o) => o.number == flowOrder.number,
+    );
+    final suffix = current.currentStage == ProductionStage.testing
+        ? 'sua sessão foi concluída. Há outros operadores nesta etapa.'
+        : current.isDone
+        ? 'sequência concluída no VettiFlow.'
+        : 'liberada para ${current.currentStage.label}.';
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('${operation.number} $suffix')));
@@ -334,14 +359,20 @@ class _EmptyTestingStage extends StatelessWidget {
               borderRadius: BorderRadius.circular(compact ? 22 : 0),
             ),
             clipBehavior: Clip.antiAlias,
-            child: const Column(
+            child: Column(
               children: [
                 VettiTopBar(
                   title: 'Teste de Producao',
-                  operatorName: 'Sabrina',
+                  operatorName:
+                      context
+                          .watch<OperatorAssignmentStore>()
+                          .currentOperator
+                          ?.name ??
+                      'Operador',
                   operatorRole: 'Teste',
+                  compact: compact,
                 ),
-                Expanded(
+                const Expanded(
                   child: _EmptyStageMessage(
                     icon: Icons.science_rounded,
                     title: 'Nenhuma OP em teste',
@@ -485,8 +516,6 @@ class _MobileTestingActionSheet extends StatelessWidget {
             _TestingMetrics(operation: operation, compact: true),
             const SizedBox(height: 16),
             _FirmwareDefectsPanel(operation: operation, compact: true),
-            const SizedBox(height: 16),
-            _ChecklistPanel(operation: operation, compact: true),
             const SizedBox(height: 20),
             _TestingActions(
               status: status,
@@ -532,9 +561,14 @@ class _MobileTestingLayout extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                const VettiTopBar(
+                VettiTopBar(
                   title: 'Teste de Producao',
-                  operatorName: 'Sabrina',
+                  operatorName:
+                      context
+                          .watch<OperatorAssignmentStore>()
+                          .currentOperator
+                          ?.name ??
+                      'Operador',
                   compact: true,
                 ),
                 Expanded(
@@ -612,9 +646,14 @@ class _DesktopTestingLayout extends StatelessWidget {
       backgroundColor: AppColors.pageBackground,
       body: Column(
         children: [
-          const VettiTopBar(
+          VettiTopBar(
             title: 'Teste de Producao',
-            operatorName: 'Sabrina',
+            operatorName:
+                context
+                    .watch<OperatorAssignmentStore>()
+                    .currentOperator
+                    ?.name ??
+                'Operador',
             operatorRole: 'Teste',
           ),
           Expanded(
@@ -787,14 +826,7 @@ class _DesktopTestingDetail extends StatelessWidget {
           const SizedBox(height: 24),
           _TestingMetrics(operation: operation),
           const SizedBox(height: 24),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _FirmwareDefectsPanel(operation: operation)),
-              const SizedBox(width: 16),
-              Expanded(child: _ChecklistPanel(operation: operation)),
-            ],
-          ),
+          _FirmwareDefectsPanel(operation: operation),
           const SizedBox(height: 28),
           _DividerLine(),
           const SizedBox(height: 28),
@@ -930,7 +962,7 @@ class _TestingCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 9),
                       Text(
-                        '${operation.quantity} · ${operation.station}',
+                        operation.quantity,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -1136,64 +1168,6 @@ class _FirmwareDefectsPanel extends StatelessWidget {
   }
 }
 
-class _ChecklistPanel extends StatelessWidget {
-  const _ChecklistPanel({required this.operation, this.compact = false});
-
-  final TestOperation operation;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(compact ? 14 : 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FBFD),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE4EDF4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Checklist de teste',
-            style: TextStyle(
-              color: AppColors.text,
-              fontSize: compact ? 15 : 16,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 10),
-          for (var i = 0; i < operation.checklist.length; i++) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.check_circle_outline_rounded,
-                  size: 17,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    operation.checklist[i],
-                    style: TextStyle(
-                      color: AppColors.muted,
-                      fontSize: compact ? 12 : 13,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (i < operation.checklist.length - 1) const SizedBox(height: 8),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _TestingActions extends StatelessWidget {
   const _TestingActions({
     required this.status,
@@ -1226,7 +1200,7 @@ class _TestingActions extends StatelessWidget {
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Teste assinado. Aprovados seguem para expedicao e defeitos para suporte.',
+                'O teste será registrado e a OP seguirá a sequência planejada. Defeitos ficam disponíveis para o suporte.',
                 style: TextStyle(
                   color: AppColors.green,
                   fontSize: 13,
@@ -1492,6 +1466,7 @@ class _TestDefectsSheetState extends State<_TestDefectsSheet> {
   Widget build(BuildContext context) {
     final records = _records;
     final totalDefects = records.fold<int>(0, (sum, d) => sum + d.quantity);
+    final exceedsOrder = totalDefects > _maxQty;
 
     return _ModalSurface(
       compact: widget.compact,
@@ -1567,10 +1542,14 @@ class _TestDefectsSheetState extends State<_TestDefectsSheet> {
                 border: Border.all(color: const Color(0xFFEFDFBF)),
               ),
               child: Text(
-                'Total: $totalDefects dispositivo${totalDefects == 1 ? '' : 's'} '
-                'em ${records.length} tipo${records.length == 1 ? '' : 's'} de defeito.',
-                style: const TextStyle(
-                  color: AppColors.orangeText,
+                exceedsOrder
+                    ? 'Total $totalDefects maior que a quantidade da OP ($_maxQty).'
+                    : 'Total: $totalDefects dispositivo${totalDefects == 1 ? '' : 's'} '
+                          'em ${records.length} tipo${records.length == 1 ? '' : 's'} de defeito.',
+                style: TextStyle(
+                  color: exceedsOrder
+                      ? const Color(0xFFD45B5B)
+                      : AppColors.orangeText,
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                 ),
@@ -1595,8 +1574,12 @@ class _TestDefectsSheetState extends State<_TestDefectsSheet> {
                   label: records.isEmpty
                       ? 'Continuar sem defeitos'
                       : 'Continuar com $totalDefects un',
-                  onPressed: () => Navigator.of(context).pop(records),
-                  fillColor: AppColors.green,
+                  onPressed: exceedsOrder
+                      ? null
+                      : () => Navigator.of(context).pop(records),
+                  fillColor: exceedsOrder
+                      ? const Color(0xFFCBD7E1)
+                      : AppColors.green,
                   foregroundColor: Colors.white,
                 ),
               ),
@@ -1818,7 +1801,7 @@ class _DefectChip extends StatelessWidget {
   }
 }
 
-Future<bool?> showTestPinDialog(
+Future<Operator?> showTestPinDialog(
   BuildContext context,
   TestOperation operation, {
   List<DefectRecord> defects = const [],
@@ -1826,7 +1809,7 @@ Future<bool?> showTestPinDialog(
   final compact = MediaQuery.sizeOf(context).width < 720;
 
   if (compact) {
-    return showModalBottomSheet<bool>(
+    return showModalBottomSheet<Operator>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -1835,7 +1818,7 @@ Future<bool?> showTestPinDialog(
     );
   }
 
-  return showDialog<bool>(
+  return showDialog<Operator>(
     context: context,
     builder: (context) => Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
@@ -2018,7 +2001,7 @@ class _TestPinSheetState extends State<_TestPinSheet> {
               Expanded(
                 child: _DialogButton(
                   label: 'Cancelar',
-                  onPressed: () => Navigator.of(context).pop(false),
+                  onPressed: () => Navigator.of(context).pop(),
                   fillColor: const Color(0xFFF6F9FB),
                   foregroundColor: AppColors.muted,
                   borderColor: AppColors.border,
@@ -2029,7 +2012,7 @@ class _TestPinSheetState extends State<_TestPinSheet> {
                 child: _DialogButton(
                   label: 'Concluir OP',
                   onPressed: valid
-                      ? () => Navigator.of(context).pop(true)
+                      ? () => Navigator.of(context).pop(_operator)
                       : null,
                   fillColor: valid ? AppColors.green : const Color(0xFFE4EDF4),
                   foregroundColor: valid ? Colors.white : AppColors.muted,

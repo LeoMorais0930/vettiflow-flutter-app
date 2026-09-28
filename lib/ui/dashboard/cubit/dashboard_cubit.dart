@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vetti_flow_1_0/data/models/ordem_producao.dart';
+import 'package:vetti_flow_1_0/data/models/protheus_product_lookup.dart';
+import 'package:vetti_flow_1_0/data/models/production_flow.dart';
 import 'package:vetti_flow_1_0/data/repositories/op_repository.dart';
 import 'package:vetti_flow_1_0/ui/dashboard/cubit/dashboard_state.dart';
 
@@ -71,23 +73,45 @@ class DashboardCubit extends Cubit<DashboardState> {
     emit(state.copyWith(selectedOP: () => null, confirmCancel: false));
   }
 
-  Future<void> advanceOP({int quantidadeArmazenada = 0}) async {
+  Future<void> advanceOP({
+    int quantidadeArmazenada = 0,
+    String? operatorName,
+    String? operatorPin,
+  }) async {
     final op = state.selectedOP;
     if (op == null) return;
-    await _repository.avancarStatus(
-      op,
-      quantidadeArmazenada: quantidadeArmazenada,
-    );
-    final ordens = await _repository.fetchOrdens();
-    final armazenadas = await _repository.fetchOrdensArmazenadas();
-    final produtos = await _repository.fetchProdutos();
+    final signer = operatorName?.trim();
     emit(
       state.copyWith(
-        ordens: ordens,
-        armazenadas: armazenadas,
-        produtos: produtos,
+        databaseSyncing: true,
+        databaseSyncMessage:
+            'Atualizando banco Protheus e VettiFlow. Enviando OP para a proxima etapa'
+            '${signer == null || signer.isEmpty ? '' : ' com assinatura de $signer'}.',
       ),
     );
+    try {
+      await _repository.avancarStatus(
+        op,
+        quantidadeArmazenada: quantidadeArmazenada,
+        operatorName: operatorName,
+        operatorPin: operatorPin,
+      );
+      final ordens = await _repository.fetchOrdens();
+      final armazenadas = await _repository.fetchOrdensArmazenadas();
+      final produtos = await _repository.fetchProdutos();
+      emit(
+        state.copyWith(
+          ordens: ordens,
+          armazenadas: armazenadas,
+          produtos: produtos,
+          databaseSyncing: false,
+          databaseSyncMessage: '',
+        ),
+      );
+    } catch (_) {
+      emit(state.copyWith(databaseSyncing: false, databaseSyncMessage: ''));
+      rethrow;
+    }
   }
 
   Future<void> regressOP() async {
@@ -106,6 +130,31 @@ class DashboardCubit extends Cubit<DashboardState> {
     );
   }
 
+  Future<void> updateRoute(List<ProductionStage> stages) async {
+    final op = state.selectedOP;
+    if (op == null) return;
+    emit(
+      state.copyWith(
+        databaseSyncing: true,
+        databaseSyncMessage: 'Salvando sequencia da OP no VettiFlow.',
+      ),
+    );
+    try {
+      await _repository.atualizarRota(op, stages);
+      final ordens = await _repository.fetchOrdens();
+      emit(
+        state.copyWith(
+          ordens: ordens,
+          databaseSyncing: false,
+          databaseSyncMessage: '',
+        ),
+      );
+    } catch (_) {
+      emit(state.copyWith(databaseSyncing: false, databaseSyncMessage: ''));
+      rethrow;
+    }
+  }
+
   void askCancel() {
     emit(state.copyWith(confirmCancel: true));
   }
@@ -114,22 +163,45 @@ class DashboardCubit extends Cubit<DashboardState> {
     emit(state.copyWith(confirmCancel: false));
   }
 
-  Future<void> cancelOP() async {
+  Future<void> cancelOP({
+    Map<String, String> returnWarehouses = const {},
+    String? operatorName,
+    String? operatorPin,
+  }) async {
     final op = state.selectedOP;
     if (op == null) return;
-    await _repository.cancelarOrdem(op);
-    final ordens = await _repository.fetchOrdens();
-    final armazenadas = await _repository.fetchOrdensArmazenadas();
-    final produtos = await _repository.fetchProdutos();
     emit(
       state.copyWith(
-        ordens: ordens,
-        armazenadas: armazenadas,
-        produtos: produtos,
-        selectedOP: () => null,
-        confirmCancel: false,
+        databaseSyncing: true,
+        databaseSyncMessage:
+            'Cancelando OP e devolvendo empenhos no Protheus e VettiFlow.',
       ),
     );
+    try {
+      await _repository.cancelarOrdem(
+        op,
+        returnWarehouses: returnWarehouses,
+        operatorName: operatorName,
+        operatorPin: operatorPin,
+      );
+      final ordens = await _repository.fetchOrdens();
+      final armazenadas = await _repository.fetchOrdensArmazenadas();
+      final produtos = await _repository.fetchProdutos();
+      emit(
+        state.copyWith(
+          ordens: ordens,
+          armazenadas: armazenadas,
+          produtos: produtos,
+          selectedOP: () => null,
+          confirmCancel: false,
+          databaseSyncing: false,
+          databaseSyncMessage: '',
+        ),
+      );
+    } catch (_) {
+      emit(state.copyWith(databaseSyncing: false, databaseSyncMessage: ''));
+      rethrow;
+    }
   }
 
   void openNovaOP() {
@@ -140,19 +212,51 @@ class DashboardCubit extends Cubit<DashboardState> {
     emit(state.copyWith(novaOPOpen: false));
   }
 
+  Future<ProtheusProductLookup?> lookupProdutoPorCodigo(String code) {
+    return _repository.lookupProdutoPorCodigo(code);
+  }
+
+  Future<List<ProtheusProduct>> searchProdutos(String query) {
+    return _repository.searchProdutos(query);
+  }
+
   Future<void> createOP(NovaOrdemDTO dto) async {
-    await _repository.criarOrdem(dto);
-    final ordens = await _repository.fetchOrdens();
-    final armazenadas = await _repository.fetchOrdensArmazenadas();
-    final produtos = await _repository.fetchProdutos();
     emit(
       state.copyWith(
-        ordens: ordens,
-        armazenadas: armazenadas,
-        produtos: produtos,
-        novaOPOpen: false,
+        databaseSyncing: true,
+        databaseSyncMessage: 'Criando OP e pedidos de materiais no VettiFlow.',
       ),
     );
+    try {
+      final criada = await _repository.criarOrdem(dto);
+      final envio = _repository.ultimoEnvioProtheus;
+      final ordens = await _repository.fetchOrdens();
+      final armazenadas = await _repository.fetchOrdensArmazenadas();
+      final produtos = await _repository.fetchProdutos();
+      emit(
+        state.copyWith(
+          ordens: ordens,
+          armazenadas: armazenadas,
+          produtos: produtos,
+          novaOPOpen: false,
+          databaseSyncing: false,
+          databaseSyncMessage: '',
+          protheusAviso: envio == null || envio.gravouNoProtheus
+              ? ''
+              : '${criada.numero}: ${envio.aviso}',
+        ),
+      );
+    } catch (_) {
+      emit(state.copyWith(databaseSyncing: false, databaseSyncMessage: ''));
+      rethrow;
+    }
+  }
+
+  /// Some com o aviso depois que a tela ja mostrou, para nao repetir a cada
+  /// rebuild.
+  void limparAvisoProtheus() {
+    if (state.protheusAviso.isEmpty) return;
+    emit(state.copyWith(protheusAviso: ''));
   }
 
   void openFiltros() {

@@ -156,16 +156,7 @@ class _ExpeditionPageState extends State<ExpeditionPage> {
   var _selectedIndex = 0;
   var _showStored = false;
   final _dispatchSummaries = <String, ExpeditionDispatchSummary>{};
-  final _dispatchedOrders = <ExpeditionDispatchedOrder>[
-    const ExpeditionDispatchedOrder(
-      number: 'OP-00563-984',
-      product: 'Controle Vetti Slim',
-      quantity: 320,
-      orderCode: 'PED-77372',
-      dispatchedAt: '11:42',
-      origin: 'Despacho direto',
-    ),
-  ];
+  final _dispatchedOrders = <ExpeditionDispatchedOrder>[];
 
   List<ProductionOrderFlow> _readyFlowOrders() => context
       .read<ProductionFlowStore>()
@@ -184,16 +175,15 @@ class _ExpeditionPageState extends State<ExpeditionPage> {
       number: order.number,
       product: order.productLabel,
       quantity: order.quantityLabel,
-      origin: 'Teste aprovado',
+      origin: order.previousStageLabel,
       readyAt: _clockLabel(order.updatedAt),
       readyAgo: order.timings[ProductionStage.expedition]?.startedAt == null
           ? 'Aguardando conferencia'
           : 'Tempo na etapa: ${formatProductionDuration(elapsed)}',
-      orderCode:
-          'PED-${order.number.replaceAll(RegExp(r'[^0-9]'), '').padLeft(5, '0')}',
-      customer: 'Estoque acabado',
-      channel: 'Reposicao interna',
-      carrier: 'Movimentacao interna',
+      orderCode: 'Sem pedido vinculado',
+      customer: 'Não vinculado',
+      channel: 'Fluxo local',
+      carrier: 'Não vinculada',
       packaging: [
         'Conferir etiqueta da OP e quantidade final.',
         'Separar volumes de ${order.productCode}.',
@@ -208,8 +198,7 @@ class _ExpeditionPageState extends State<ExpeditionPage> {
       product: order.productLabel,
       quantity: order.storedQuantity,
       originalQuantity: order.quantity,
-      orderCode:
-          'PED-${order.number.replaceAll(RegExp(r'[^0-9]'), '').padLeft(5, '0')}',
+      orderCode: 'Sem pedido vinculado',
       storedAt: _clockLabel(order.updatedAt),
     );
   }
@@ -227,11 +216,11 @@ class _ExpeditionPageState extends State<ExpeditionPage> {
     setState(() => _selectedIndex = index);
   }
 
-  void _startExpedition() {
+  Future<void> _startExpedition() async {
     final order = _selectedFlowOrder();
     if (order == null) return;
     final operator = context.read<OperatorAssignmentStore>().currentOperator;
-    context.read<ProductionFlowStore>().startStage(
+    await context.read<ProductionFlowStore>().startStage(
       order.number,
       operatorName: operator?.name ?? 'Expedicao',
       operatorPin: operator?.pin,
@@ -247,7 +236,7 @@ class _ExpeditionPageState extends State<ExpeditionPage> {
       maxQuantity: order.quantity,
     );
     if (!mounted || request == null) return;
-    context.read<ProductionFlowStore>().pauseStage(
+    await context.read<ProductionFlowStore>().pauseStage(
       order.number,
       operatorName: request.operatorName,
       operatorPin: request.operatorPin,
@@ -265,10 +254,19 @@ class _ExpeditionPageState extends State<ExpeditionPage> {
     if (!mounted || storedQuantity == null) return;
 
     final dispatchedQuantity = order.quantityValue - storedQuantity;
-    context.read<ProductionFlowStore>().completeExpedition(
-      flowOrder.number,
-      storedQuantity: storedQuantity,
-    );
+    try {
+      await context.read<ProductionFlowStore>().completeExpedition(
+        flowOrder.number,
+        storedQuantity: storedQuantity,
+      );
+    } on StateError catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+      return;
+    }
+    if (!mounted) return;
     setState(() {
       _dispatchSummaries[order.number] = ExpeditionDispatchSummary(
         dispatchedQuantity: dispatchedQuantity,
@@ -328,10 +326,11 @@ class _ExpeditionPageState extends State<ExpeditionPage> {
     );
     if (!mounted || quantityToDispatch == null) return;
 
-    context.read<ProductionFlowStore>().dispatchStored(
+    await context.read<ProductionFlowStore>().dispatchStored(
       storedOrder.number,
       quantity: quantityToDispatch,
     );
+    if (!mounted) return;
     setState(() {
       _recordDispatched(
         number: storedOrder.number,
@@ -591,11 +590,17 @@ class _MobileExpeditionLayout extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                const VettiTopBar(
-                  title: 'Expedicao',
-                  operatorName: 'Rafaela',
+                VettiTopBar(
+                  title: 'Expedição · local',
+                  operatorName:
+                      context
+                          .watch<OperatorAssignmentStore?>()
+                          ?.currentOperator
+                          ?.name ??
+                      'Consulta',
                   compact: true,
                 ),
+                const _LocalExpeditionNotice(),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(14, 18, 14, 22),
@@ -703,11 +708,17 @@ class _DesktopExpeditionLayout extends StatelessWidget {
       backgroundColor: AppColors.pageBackground,
       body: Column(
         children: [
-          const VettiTopBar(
-            title: 'Expedicao',
-            operatorName: 'Rafaela',
-            operatorRole: 'Expedicao',
+          VettiTopBar(
+            title: 'Expedição · local',
+            operatorName:
+                context
+                    .watch<OperatorAssignmentStore?>()
+                    ?.currentOperator
+                    ?.name ??
+                'Consulta',
+            operatorRole: 'Fluxo local',
           ),
+          const _LocalExpeditionNotice(),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(40, 32, 40, 36),
@@ -3016,4 +3027,29 @@ class _PinFeedback extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LocalExpeditionNotice extends StatelessWidget {
+  const _LocalExpeditionNotice();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    child: Row(
+      children: [
+        const Expanded(
+          child: Text(
+            'Conferência local. Não emite nota nem altera o estoque do Protheus.',
+            style: TextStyle(fontSize: 12, color: AppColors.muted),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Consultar Protheus',
+          icon: const Icon(Icons.manage_search_outlined),
+          onPressed: () =>
+              Navigator.of(context).pushReplacementNamed('/expedicao'),
+        ),
+      ],
+    ),
+  );
 }

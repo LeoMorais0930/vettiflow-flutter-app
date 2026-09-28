@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vetti_flow_1_0/data/models/production_flow.dart';
+import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
 import 'package:vetti_flow_1_0/data/repositories/production_flow_store.dart';
 import 'package:vetti_flow_1_0/shared/layout/app_breakpoints.dart';
+import 'package:vetti_flow_1_0/shared/models/operator.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
 import 'package:vetti_flow_1_0/ui/shared/widgets/vetti_top_bar.dart';
+export 'warehouse_read_page.dart' show WarehousePage;
 
 class WarehouseItem {
   const WarehouseItem({
@@ -42,16 +45,16 @@ class WarehouseRequest {
   final List<WarehouseItem> items;
 }
 
-class WarehousePage extends StatefulWidget {
-  const WarehousePage({super.key});
+class WarehousePickingPage extends StatefulWidget {
+  const WarehousePickingPage({super.key});
 
   @override
-  State<WarehousePage> createState() => _WarehousePageState();
+  State<WarehousePickingPage> createState() => _WarehousePageState();
 }
 
-class _WarehousePageState extends State<WarehousePage> {
+class _WarehousePageState extends State<WarehousePickingPage> {
   var _selectedIndex = 0;
-  var _showCreate = false;
+  static const _showCreate = false;
 
   WarehouseRequest _requestFromOrder(ProductionOrderFlow order) {
     final catalog = context.read<ProductionFlowStore>().catalogItem(
@@ -77,54 +80,97 @@ class _WarehousePageState extends State<WarehousePage> {
     );
   }
 
-  void _startPicking() {
+  Future<void> _startPicking() async {
     final order = _selectedOrder();
     if (order == null) return;
-    context.read<ProductionFlowStore>().startStage(
+    final operator = _warehouseOperator();
+    await context.read<ProductionFlowStore>().startStage(
       order.number,
-      operatorName: 'Vera',
+      operatorName: operator.name,
+      operatorPin: operator.pin,
     );
   }
 
-  void _pausePicking() {
+  Future<void> _pausePicking() async {
     final order = _selectedOrder();
     if (order == null) return;
-    context.read<ProductionFlowStore>().pauseStage(order.number);
+    final operator = _warehouseOperator();
+    await context.read<ProductionFlowStore>().pauseStage(
+      order.number,
+      operatorName: operator.name,
+      operatorPin: operator.pin,
+    );
   }
 
   Future<void> _deliverItems() async {
     final order = _selectedOrder();
     if (order == null) return;
-    final confirmed = await showWarehouseDeliveryDialog(
+    final confirmation = await showWarehouseDeliveryDialog(
       context,
       request: _requestFromOrder(order),
     );
-    if (!mounted || confirmed != true) return;
-    context.read<ProductionFlowStore>().completeStage(order.number);
+    if (!mounted || confirmation == null) return;
+    final operator = context.read<OperatorAssignmentStore>().findByPin(
+      confirmation.operatorPin,
+    );
+    if (operator == null || operator.stage != WorkStage.warehouse) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PIN do almoxarifado inválido.')),
+      );
+      return;
+    }
+    await context.read<ProductionFlowStore>().completeStage(
+      order.number,
+      observation: confirmation.observation,
+      operatorName: operator.name,
+      operatorPin: operator.pin,
+    );
+    if (!mounted) return;
     setState(() {
       _selectedIndex = 0;
-      _showCreate = false;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${order.number} liberada para Firmware.')),
+      SnackBar(content: Text('${order.number} liberada para SMD.')),
     );
   }
 
-  void _createOrder({
+  Future<void> _createOrder({
     required String productCode,
     required int quantity,
     required String priority,
-  }) {
-    final order = context.read<ProductionFlowStore>().createOrder(
+  }) async {
+    final store = context.read<ProductionFlowStore>();
+    final order = await store.createOrder(
       productCode: productCode,
       quantity: quantity,
       priority: priority,
-      operatorName: 'Vera',
+      operatorName: _warehouseOperator().name,
     );
+    if (!mounted) return;
     setState(() {
-      _showCreate = false;
       _selectedIndex = 0;
     });
+
+    final envio = store.protheusOutcome(order.number);
+    if (envio != null && !envio.gravouNoProtheus) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.danger,
+            duration: const Duration(seconds: 12),
+            content: Text(
+              '${order.number} criada no Almoxarifado, mas ${envio.aviso}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        );
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${order.number} criada no Almoxarifado.')),
     );
@@ -137,6 +183,14 @@ class _WarehousePageState extends State<WarehousePage> {
     if (orders.isEmpty) return null;
     final index = _selectedIndex.clamp(0, orders.length - 1).toInt();
     return orders[index];
+  }
+
+  Operator _warehouseOperator() {
+    final current = context.read<OperatorAssignmentStore>().currentOperator;
+    if (current != null && current.stage == WorkStage.warehouse) {
+      return current;
+    }
+    return Operator.findByPin('4003')!;
   }
 
   @override
@@ -163,13 +217,10 @@ class _WarehousePageState extends State<WarehousePage> {
             status: requests.isEmpty
                 ? 'Sem OPs'
                 : requests[_selectedIndex].status,
-            onShowQueue: () => setState(() => _showCreate = false),
-            onShowCreate: () => setState(() => _showCreate = true),
+            onShowQueue: () {},
+            onShowCreate: () {},
             onCreate: _createOrder,
-            onSelect: (index) => setState(() {
-              _selectedIndex = index;
-              _showCreate = false;
-            }),
+            onSelect: (index) => setState(() => _selectedIndex = index),
             onStart: _startPicking,
             onPause: _pausePicking,
             onDeliver: _deliverItems,
@@ -183,13 +234,10 @@ class _WarehousePageState extends State<WarehousePage> {
           status: requests.isEmpty
               ? 'Sem OPs'
               : requests[_selectedIndex].status,
-          onShowQueue: () => setState(() => _showCreate = false),
-          onShowCreate: () => setState(() => _showCreate = true),
+          onShowQueue: () {},
+          onShowCreate: () {},
           onCreate: _createOrder,
-          onSelect: (index) => setState(() {
-            _selectedIndex = index;
-            _showCreate = false;
-          }),
+          onSelect: (index) => setState(() => _selectedIndex = index),
           onStart: _startPicking,
           onPause: _pausePicking,
           onDeliver: _deliverItems,
@@ -506,14 +554,6 @@ class _WarehouseTabs extends StatelessWidget {
               label: 'Separacao',
               active: !showCreate,
               onTap: onShowQueue,
-              compact: compact,
-            ),
-          ),
-          Expanded(
-            child: _WarehouseTabButton(
-              label: 'Criar OP',
-              active: showCreate,
-              onTap: onShowCreate,
               compact: compact,
             ),
           ),
@@ -1080,10 +1120,18 @@ class _WarehouseCreateFormState extends State<_WarehouseCreateForm> {
   @override
   void initState() {
     super.initState();
-    _productCode = ProductionFlowStore.catalog.first.code;
-    _quantityController = TextEditingController(
-      text: '${ProductionFlowStore.catalog.first.defaultQuantity}',
-    );
+    _productCode = '';
+    _quantityController = TextEditingController(text: '1');
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final catalog = context.watch<ProductionFlowStore>().catalogItems;
+    if (_productCode.isEmpty && catalog.isNotEmpty) {
+      _productCode = catalog.first.code;
+      _quantityController.text = '${catalog.first.defaultQuantity}';
+    }
   }
 
   @override
@@ -1094,8 +1142,13 @@ class _WarehouseCreateFormState extends State<_WarehouseCreateForm> {
 
   @override
   Widget build(BuildContext context) {
-    final selected = ProductionFlowStore.catalog.firstWhere(
+    final catalog = context.watch<ProductionFlowStore>().catalogItems;
+    if (catalog.isEmpty) {
+      return _WarehouseCreateUnavailable(compact: widget.compact);
+    }
+    final selected = catalog.firstWhere(
       (item) => item.code == _productCode,
+      orElse: () => catalog.first,
     );
 
     return Container(
@@ -1130,12 +1183,12 @@ class _WarehouseCreateFormState extends State<_WarehouseCreateForm> {
             initialValue: _productCode,
             decoration: const InputDecoration(labelText: 'Produto'),
             items: [
-              for (final item in ProductionFlowStore.catalog)
+              for (final item in catalog)
                 DropdownMenuItem(value: item.code, child: Text(item.label)),
             ],
             onChanged: (value) {
               if (value == null) return;
-              final item = ProductionFlowStore.catalog.firstWhere(
+              final item = catalog.firstWhere(
                 (product) => product.code == value,
               );
               setState(() {
@@ -1193,6 +1246,33 @@ class _WarehouseCreateFormState extends State<_WarehouseCreateForm> {
       productCode: _productCode,
       quantity: quantity,
       priority: _priority,
+    );
+  }
+}
+
+class _WarehouseCreateUnavailable extends StatelessWidget {
+  const _WarehouseCreateUnavailable({required this.compact});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(compact ? 16 : 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        'Crie a OP pelo dashboard usando um código real do Protheus.',
+        style: TextStyle(
+          color: AppColors.muted,
+          fontSize: compact ? 13 : 16,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }
@@ -1402,15 +1482,51 @@ class _SummaryValue extends StatelessWidget {
   }
 }
 
-Future<bool?> showWarehouseDeliveryDialog(
+class WarehouseDeliveryConfirmation {
+  const WarehouseDeliveryConfirmation({
+    required this.operatorPin,
+    this.observation,
+  });
+
+  final String operatorPin;
+  final String? observation;
+}
+
+Future<WarehouseDeliveryConfirmation?> showWarehouseDeliveryDialog(
   BuildContext context, {
   required WarehouseRequest request,
 }) {
-  final observationController = TextEditingController();
-
-  return showDialog<bool>(
+  return showDialog<WarehouseDeliveryConfirmation>(
     context: context,
-    builder: (context) => AlertDialog(
+    builder: (context) => _WarehouseDeliveryDialog(request: request),
+  );
+}
+
+class _WarehouseDeliveryDialog extends StatefulWidget {
+  const _WarehouseDeliveryDialog({required this.request});
+
+  final WarehouseRequest request;
+
+  @override
+  State<_WarehouseDeliveryDialog> createState() =>
+      _WarehouseDeliveryDialogState();
+}
+
+class _WarehouseDeliveryDialogState extends State<_WarehouseDeliveryDialog> {
+  final _observationController = TextEditingController();
+  final _pinController = TextEditingController();
+  String? _pinError;
+
+  @override
+  void dispose() {
+    _observationController.dispose();
+    _pinController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
       title: const Text('Entregar ao suporte'),
       content: SizedBox(
         width: 520,
@@ -1419,12 +1535,13 @@ Future<bool?> showWarehouseDeliveryDialog(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${request.number} · ${request.operation}',
+              '${widget.request.number} · ${widget.request.operation}',
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 16),
             TextField(
-              controller: observationController,
+              key: const Key('warehouse-delivery-observation'),
+              controller: _observationController,
               minLines: 3,
               maxLines: 5,
               decoration: const InputDecoration(
@@ -1432,22 +1549,42 @@ Future<bool?> showWarehouseDeliveryDialog(
               ),
             ),
             const SizedBox(height: 16),
-            const TextField(
-              decoration: InputDecoration(labelText: 'PIN', hintText: '4003'),
+            TextField(
+              key: const Key('warehouse-delivery-pin'),
+              controller: _pinController,
+              decoration: InputDecoration(
+                labelText: 'PIN',
+                hintText: '4003',
+                errorText: _pinError,
+              ),
+              keyboardType: TextInputType.number,
             ),
           ],
         ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancelar'),
         ),
         ElevatedButton(
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () {
+            final pin = _pinController.text.trim();
+            if (pin.isEmpty) {
+              setState(() => _pinError = 'Informe o PIN.');
+              return;
+            }
+            final observation = _observationController.text.trim();
+            Navigator.of(context).pop(
+              WarehouseDeliveryConfirmation(
+                operatorPin: pin,
+                observation: observation.isEmpty ? null : observation,
+              ),
+            );
+          },
           child: const Text('Confirmar entrega'),
         ),
       ],
-    ),
-  ).whenComplete(observationController.dispose);
+    );
+  }
 }

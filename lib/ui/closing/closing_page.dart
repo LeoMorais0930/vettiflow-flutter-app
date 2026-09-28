@@ -8,6 +8,7 @@ import 'package:vetti_flow_1_0/shared/layout/app_breakpoints.dart';
 import 'package:vetti_flow_1_0/shared/models/operator.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
 import 'package:vetti_flow_1_0/ui/shared/widgets/collaborator_stage_view.dart';
+import 'package:vetti_flow_1_0/ui/shared/widgets/pause_reason_dialog.dart';
 import 'package:vetti_flow_1_0/ui/shared/widgets/vetti_top_bar.dart';
 
 class ClosingOperation {
@@ -18,14 +19,18 @@ class ClosingOperation {
     required this.origin,
     required this.receivedAt,
     required this.receivedAgo,
+    required this.status,
+    this.nextStageLabel = 'Expedicao',
   });
 
+  final String nextStageLabel;
   final String number;
   final String product;
   final String quantity;
   final String origin;
   final String receivedAt;
   final String receivedAgo;
+  final ProductionRunStatus status;
 }
 
 class ClosingSignature {
@@ -44,6 +49,18 @@ class ClosingPage extends StatefulWidget {
 
 class _ClosingPageState extends State<ClosingPage> {
   var _selectedIndex = 0;
+  bool _initialSelectionApplied = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialSelectionApplied) return;
+    _initialSelectionApplied = true;
+    final number = ModalRoute.of(context)?.settings.arguments;
+    if (number is! String) return;
+    final index = _flowOrders().indexWhere((order) => order.number == number);
+    if (index >= 0) _selectedIndex = index;
+  }
 
   List<ProductionOrderFlow> _flowOrders() => context
       .read<ProductionFlowStore>()
@@ -61,17 +78,49 @@ class _ClosingPageState extends State<ClosingPage> {
     return ClosingOperation(
       number: order.number,
       product: order.productLabel,
-      quantity: order.quantityLabel,
-      origin: 'Teste',
+      quantity: order.productionQuantityLabel,
+      origin: order.previousStageLabel,
+      nextStageLabel: order.nextStageLabel,
       receivedAt: _clockLabel(order.updatedAt),
       receivedAgo: order.timings[ProductionStage.closing]?.startedAt == null
           ? 'Aguardando fechamento'
           : 'Tempo na etapa: ${formatProductionDuration(elapsed)}',
+      status: order.status,
     );
   }
 
   void _select(int index) {
     setState(() => _selectedIndex = index);
+  }
+
+  Future<void> _startOperation() async {
+    final order = _selectedFlowOrder();
+    if (order == null) return;
+    final operator = context.read<OperatorAssignmentStore>().currentOperator;
+    await context.read<ProductionFlowStore>().startStage(
+      order.number,
+      operatorName: operator?.name ?? 'Operador',
+      operatorPin: operator?.pin,
+    );
+  }
+
+  Future<void> _pauseOperation() async {
+    final order = _selectedFlowOrder();
+    if (order == null) return;
+    final request = await showPauseReasonDialog(
+      context,
+      stage: ProductionStage.closing,
+      maxQuantity: order.productionQuantity.floor(),
+    );
+    if (!mounted || request == null) return;
+    await context.read<ProductionFlowStore>().pauseStage(
+      order.number,
+      operatorName: request.operatorName,
+      operatorPin: request.operatorPin,
+      reason: request.reason,
+      customReason: request.customReason,
+      producedQuantity: request.producedQuantity,
+    );
   }
 
   Future<void> _advanceOperation() async {
@@ -81,13 +130,29 @@ class _ClosingPageState extends State<ClosingPage> {
     final signature = await showClosingSignatureDialog(context, operation);
     if (!mounted || signature == null) return;
 
-    context.read<ProductionFlowStore>().completeStage(
+    await context.read<ProductionFlowStore>().completeStage(
       flowOrder.number,
       observation: signature.observation,
+      operatorName: signature.operator.name,
+      operatorPin: signature.operator.pin,
     );
+    if (!mounted) return;
     setState(() => _selectedIndex = 0);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${operation.number} enviada para expedicao.')),
+      SnackBar(
+        content: Text(
+          context
+                      .read<ProductionFlowStore>()
+                      .orders
+                      .firstWhere((o) => o.number == flowOrder.number)
+                      .currentStage ==
+                  flowOrder.currentStage
+              ? '${operation.number}: sua participação foi concluída.'
+              : flowOrder.nextStage == ProductionStage.completed
+              ? '${operation.number}: sequência concluída no VettiFlow.'
+              : '${operation.number} liberada para ${flowOrder.nextStage.label}.',
+        ),
+      ),
     );
   }
 
@@ -101,6 +166,14 @@ class _ClosingPageState extends State<ClosingPage> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => _MobileClosingActionSheet(
         operation: operation,
+        onStart: () {
+          Navigator.pop(ctx);
+          _startOperation();
+        },
+        onPause: () {
+          Navigator.pop(ctx);
+          _pauseOperation();
+        },
         onAdvance: () {
           Navigator.pop(ctx);
           _advanceOperation();
@@ -141,6 +214,8 @@ class _ClosingPageState extends State<ClosingPage> {
           operations: operations,
           selectedIndex: _selectedIndex,
           onSelect: _select,
+          onStart: _startOperation,
+          onPause: _pauseOperation,
           onAdvance: _advanceOperation,
         );
       },
@@ -178,14 +253,19 @@ class _EmptyClosingStage extends StatelessWidget {
               borderRadius: BorderRadius.circular(compact ? 22 : 0),
             ),
             clipBehavior: Clip.antiAlias,
-            child: const Column(
+            child: Column(
               children: [
                 VettiTopBar(
                   title: 'Fechamento',
-                  operatorName: 'Miriam',
+                  operatorName:
+                      context
+                          .watch<OperatorAssignmentStore>()
+                          .currentOperator
+                          ?.name ??
+                      'Operador',
                   operatorRole: 'Fechamento',
                 ),
-                Expanded(
+                const Expanded(
                   child: _EmptyStageMessage(
                     icon: Icons.inventory_2_rounded,
                     title: 'Nenhuma OP em fechamento',
@@ -230,9 +310,14 @@ class _MobileClosingLayout extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                const VettiTopBar(
+                VettiTopBar(
                   title: 'Fechamento',
-                  operatorName: 'Miriam',
+                  operatorName:
+                      context
+                          .watch<OperatorAssignmentStore>()
+                          .currentOperator
+                          ?.name ??
+                      'Operador',
                   compact: true,
                 ),
                 Expanded(
@@ -286,12 +371,16 @@ class _DesktopClosingLayout extends StatelessWidget {
     required this.operations,
     required this.selectedIndex,
     required this.onSelect,
+    required this.onStart,
+    required this.onPause,
     required this.onAdvance,
   });
 
   final List<ClosingOperation> operations;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
+  final VoidCallback onStart;
+  final VoidCallback onPause;
   final VoidCallback onAdvance;
 
   ClosingOperation get selectedOperation => operations[selectedIndex];
@@ -314,9 +403,9 @@ class _DesktopClosingLayout extends StatelessWidget {
       icon: Icons.password_rounded,
       accent: AppColors.orange,
     ),
-    const CollaboratorStageMetric(
+    CollaboratorStageMetric(
       label: 'Proxima etapa',
-      value: 'Expedicao',
+      value: selectedOperation.nextStageLabel,
       icon: Icons.local_shipping_rounded,
       accent: Color(0xFF7458D8),
     ),
@@ -328,9 +417,14 @@ class _DesktopClosingLayout extends StatelessWidget {
       backgroundColor: AppColors.pageBackground,
       body: Column(
         children: [
-          const VettiTopBar(
+          VettiTopBar(
             title: 'Fechamento',
-            operatorName: 'Miriam',
+            operatorName:
+                context
+                    .watch<OperatorAssignmentStore>()
+                    .currentOperator
+                    ?.name ??
+                'Operador',
             operatorRole: 'Fechamento',
           ),
           Expanded(
@@ -351,6 +445,8 @@ class _DesktopClosingLayout extends StatelessWidget {
                   accent: AppColors.green,
                   child: _DesktopClosingDetail(
                     operation: selectedOperation,
+                    onStart: onStart,
+                    onPause: onPause,
                     onAdvance: onAdvance,
                   ),
                 ),
@@ -382,7 +478,7 @@ class _DesktopClosingQueue extends StatelessWidget {
         CollaboratorQueueHeading(
           icon: Icons.inventory_2_rounded,
           title: 'OPs para fechamento',
-          subtitle: 'Liberadas pelo teste para fechamento final.',
+          subtitle: 'OPs direcionadas para esta etapa.',
           count: '${operations.length}',
         ),
         const SizedBox(height: 18),
@@ -402,10 +498,14 @@ class _DesktopClosingQueue extends StatelessWidget {
 class _DesktopClosingDetail extends StatelessWidget {
   const _DesktopClosingDetail({
     required this.operation,
+    required this.onStart,
+    required this.onPause,
     required this.onAdvance,
   });
 
   final ClosingOperation operation;
+  final VoidCallback onStart;
+  final VoidCallback onPause;
   final VoidCallback onAdvance;
 
   @override
@@ -418,7 +518,7 @@ class _DesktopClosingDetail extends StatelessWidget {
           children: [
             Expanded(child: _OperationTitle(operation: operation)),
             const SizedBox(width: 14),
-            const _ClosingStatusChip(),
+            _ClosingStatusChip(status: operation.status),
           ],
         ),
         const SizedBox(height: 24),
@@ -440,13 +540,11 @@ class _DesktopClosingDetail extends StatelessWidget {
           style: TextStyle(color: AppColors.muted, fontSize: 13),
         ),
         const SizedBox(height: 20),
-        _ActionButton(
-          label: 'Avancar para expedicao',
-          icon: Icons.arrow_forward_rounded,
-          onPressed: onAdvance,
-          fillColor: AppColors.green,
-          foregroundColor: Colors.white,
-          width: 280,
+        _ClosingActions(
+          status: operation.status,
+          onStart: onStart,
+          onPause: onPause,
+          onAdvance: onAdvance,
         ),
       ],
     );
@@ -456,10 +554,14 @@ class _DesktopClosingDetail extends StatelessWidget {
 class _MobileClosingActionSheet extends StatelessWidget {
   const _MobileClosingActionSheet({
     required this.operation,
+    required this.onStart,
+    required this.onPause,
     required this.onAdvance,
   });
 
   final ClosingOperation operation;
+  final VoidCallback onStart;
+  final VoidCallback onPause;
   final VoidCallback onAdvance;
 
   @override
@@ -489,19 +591,18 @@ class _MobileClosingActionSheet extends StatelessWidget {
                 child: _OperationTitle(operation: operation, compact: true),
               ),
               const SizedBox(width: 10),
-              const _ClosingStatusChip(compact: true),
+              _ClosingStatusChip(status: operation.status, compact: true),
             ],
           ),
           const SizedBox(height: 16),
           _ClosingMetrics(operation: operation, compact: true),
           const SizedBox(height: 18),
-          _ActionButton(
-            label: 'Avancar para expedicao',
-            icon: Icons.arrow_forward_rounded,
-            onPressed: onAdvance,
-            fillColor: AppColors.green,
-            foregroundColor: Colors.white,
-            width: double.infinity,
+          _ClosingActions(
+            status: operation.status,
+            onStart: onStart,
+            onPause: onPause,
+            onAdvance: onAdvance,
+            compact: true,
           ),
         ],
       ),
@@ -558,7 +659,7 @@ class _ClosingCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const _ClosingStatusChip(compact: true),
+                  _ClosingStatusChip(status: operation.status, compact: true),
                 ],
               ),
               const SizedBox(height: 7),
@@ -724,29 +825,103 @@ class _MetricItem extends StatelessWidget {
 }
 
 class _ClosingStatusChip extends StatelessWidget {
-  const _ClosingStatusChip({this.compact = false});
+  const _ClosingStatusChip({required this.status, this.compact = false});
 
+  final ProductionRunStatus status;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final label = switch (status) {
+      ProductionRunStatus.waiting => 'Aguardando',
+      ProductionRunStatus.active => 'Em fechamento',
+      ProductionRunStatus.paused => 'Pausada',
+      ProductionRunStatus.completed => 'Concluida',
+    };
+    final color = switch (status) {
+      ProductionRunStatus.waiting => AppColors.muted,
+      ProductionRunStatus.active => AppColors.primary,
+      ProductionRunStatus.paused => AppColors.orangeText,
+      ProductionRunStatus.completed => AppColors.green,
+    };
+    final surface = switch (status) {
+      ProductionRunStatus.waiting => const Color(0xFFEFF3F7),
+      ProductionRunStatus.active => const Color(0xFFE7F4FB),
+      ProductionRunStatus.paused => const Color(0xFFFBF1E2),
+      ProductionRunStatus.completed => const Color(0xFFE7F6EC),
+    };
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 9 : 12,
         vertical: compact ? 5 : 7,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFE7F4FB),
+        color: surface,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        'Pronta',
+        label,
         style: TextStyle(
-          color: AppColors.primary,
+          color: color,
           fontSize: compact ? 11 : 12,
           fontWeight: FontWeight.w900,
         ),
       ),
+    );
+  }
+}
+
+class _ClosingActions extends StatelessWidget {
+  const _ClosingActions({
+    required this.status,
+    required this.onStart,
+    required this.onPause,
+    required this.onAdvance,
+    this.compact = false,
+  });
+
+  final ProductionRunStatus status;
+  final VoidCallback onStart;
+  final VoidCallback onPause;
+  final VoidCallback onAdvance;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == ProductionRunStatus.waiting) {
+      return _ActionButton(
+        label: 'Iniciar fechamento',
+        icon: Icons.play_arrow_rounded,
+        onPressed: onStart,
+        fillColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        width: compact ? double.infinity : 240,
+      );
+    }
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        _ActionButton(
+          label: status == ProductionRunStatus.paused ? 'Retomar' : 'Pausar',
+          icon: status == ProductionRunStatus.paused
+              ? Icons.play_arrow_rounded
+              : Icons.pause_rounded,
+          onPressed: status == ProductionRunStatus.paused ? onStart : onPause,
+          fillColor: Colors.white,
+          foregroundColor: AppColors.primary,
+          width: compact ? double.infinity : 180,
+        ),
+        _ActionButton(
+          label: 'Concluir etapa',
+          icon: Icons.local_shipping_rounded,
+          onPressed: onAdvance,
+          fillColor: AppColors.green,
+          foregroundColor: Colors.white,
+          width: compact ? double.infinity : 260,
+        ),
+      ],
     );
   }
 }
@@ -943,7 +1118,7 @@ class _ClosingSignatureSheetState extends State<_ClosingSignatureSheet> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Digite o PIN para enviar a ${widget.operation.number} para expedicao.',
+            'Digite o PIN para concluir esta etapa da ${widget.operation.number}.',
             style: const TextStyle(color: AppColors.muted, fontSize: 13),
           ),
           const SizedBox(height: 24),

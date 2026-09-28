@@ -4,6 +4,7 @@ import 'package:vetti_flow_1_0/data/models/production_flow.dart';
 import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
 import 'package:vetti_flow_1_0/data/repositories/production_flow_store.dart';
 import 'package:vetti_flow_1_0/shared/layout/app_breakpoints.dart';
+import 'package:vetti_flow_1_0/shared/models/operator.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
 import 'package:vetti_flow_1_0/ui/firmware/widgets/firmware_completion_dialogs.dart';
 import 'package:vetti_flow_1_0/ui/firmware/widgets/firmware_models.dart';
@@ -15,7 +16,54 @@ import 'package:vetti_flow_1_0/ui/shared/widgets/pause_reason_dialog.dart';
 import 'package:vetti_flow_1_0/ui/shared/widgets/vetti_top_bar.dart';
 
 class FirmwarePage extends StatefulWidget {
-  const FirmwarePage({super.key});
+  const FirmwarePage({
+    super.key,
+    this.stage = ProductionStage.firmware,
+    this.workStage = WorkStage.firmware,
+    this.title = 'Gravacao de Firmware',
+    this.operatorName = 'Juliana',
+    this.operatorRole = 'Gravacao',
+    this.origin = 'SMD',
+    this.emptyText = 'Nenhuma OP aguardando firmware.',
+    this.queueSubtitle = 'OPs direcionadas para esta etapa.',
+    this.runningMetricLabel = 'Em gravacao',
+    this.nextStageLabel = 'Soldagem',
+    this.startLabel = 'Iniciar gravacao',
+    this.resumeLabel = 'Retomar gravacao',
+    this.completeLabel = 'Concluir OP',
+    this.pauseLabel = 'Pausar OP',
+    this.waitingHint = 'Inicie a gravacao para liberar as demais acoes.',
+    this.runningHint = 'Gravacao em andamento. Pause ou conclua a OP.',
+    this.pausedHint = 'OP pausada. Retome ou conclua a gravacao.',
+    this.completedLabel = 'OP concluida e enviada para a proxima etapa.',
+    this.completionSnackTarget = 'Soldagem',
+    this.collectDefectsOnComplete = true,
+    this.stageIcon = Icons.memory_rounded,
+    this.accent = AppColors.primary,
+  });
+
+  final ProductionStage stage;
+  final WorkStage workStage;
+  final String title;
+  final String operatorName;
+  final String operatorRole;
+  final String origin;
+  final String emptyText;
+  final String queueSubtitle;
+  final String runningMetricLabel;
+  final String nextStageLabel;
+  final String startLabel;
+  final String resumeLabel;
+  final String completeLabel;
+  final String pauseLabel;
+  final String waitingHint;
+  final String runningHint;
+  final String pausedHint;
+  final String completedLabel;
+  final String completionSnackTarget;
+  final bool collectDefectsOnComplete;
+  final IconData stageIcon;
+  final Color accent;
 
   @override
   State<FirmwarePage> createState() => _FirmwarePageState();
@@ -23,10 +71,21 @@ class FirmwarePage extends StatefulWidget {
 
 class _FirmwarePageState extends State<FirmwarePage> {
   var _selectedIndex = 0;
+  bool _initialSelectionApplied = false;
 
-  List<ProductionOrderFlow> _flowOrders() => context
-      .read<ProductionFlowStore>()
-      .ordersAtStage(ProductionStage.firmware);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialSelectionApplied) return;
+    _initialSelectionApplied = true;
+    final number = ModalRoute.of(context)?.settings.arguments;
+    if (number is! String) return;
+    final index = _flowOrders().indexWhere((order) => order.number == number);
+    if (index >= 0) _selectedIndex = index;
+  }
+
+  List<ProductionOrderFlow> _flowOrders() =>
+      context.read<ProductionFlowStore>().ordersAtStage(widget.stage);
 
   ProductionOrderFlow? _selectedFlowOrder() {
     final orders = _flowOrders();
@@ -40,10 +99,10 @@ class _FirmwarePageState extends State<FirmwarePage> {
     return FirmwareOperation(
       number: order.number,
       product: order.productLabel,
-      quantity: order.quantityLabel,
-      origin: 'Almoxarifado',
+      quantity: order.productionQuantityLabel,
+      origin: order.previousStageLabel,
       receivedAt: _timeLabel(order.updatedAt),
-      receivedAgo: order.timings[ProductionStage.firmware]?.startedAt == null
+      receivedAgo: order.timings[widget.stage]?.startedAt == null
           ? 'Aguardando inicio'
           : 'Tempo na etapa: ${formatProductionDuration(elapsed)}',
     );
@@ -62,13 +121,13 @@ class _FirmwarePageState extends State<FirmwarePage> {
     setState(() => _selectedIndex = index);
   }
 
-  void _startRecording() {
+  Future<void> _startRecording() async {
     final order = _selectedFlowOrder();
     if (order == null) return;
     final operator = context.read<OperatorAssignmentStore>().currentOperator;
-    context.read<ProductionFlowStore>().startStage(
+    await context.read<ProductionFlowStore>().startStage(
       order.number,
-      operatorName: operator?.name ?? 'Juliana',
+      operatorName: operator?.name ?? widget.operatorName,
       operatorPin: operator?.pin,
     );
   }
@@ -78,11 +137,11 @@ class _FirmwarePageState extends State<FirmwarePage> {
     if (order == null) return;
     final request = await showPauseReasonDialog(
       context,
-      stage: ProductionStage.firmware,
-      maxQuantity: order.quantity,
+      stage: widget.stage,
+      maxQuantity: order.productionQuantity.floor(),
     );
     if (!mounted || request == null) return;
-    context.read<ProductionFlowStore>().pauseStage(
+    await context.read<ProductionFlowStore>().pauseStage(
       order.number,
       operatorName: request.operatorName,
       operatorPin: request.operatorPin,
@@ -92,34 +151,55 @@ class _FirmwarePageState extends State<FirmwarePage> {
     );
   }
 
-  void _resetOperation() {
+  Future<void> _resetOperation() async {
     final order = _selectedFlowOrder();
     if (order == null) return;
-    context.read<ProductionFlowStore>().resetStage(order.number);
+    await context.read<ProductionFlowStore>().resetStage(order.number);
   }
 
   Future<void> _completeOperation() async {
     final flowOrder = _selectedFlowOrder();
     if (flowOrder == null) return;
     final selectedOperation = _operationFromFlow(flowOrder);
-    final defects = await showFirmwareDefectsDialog(context);
+    final defects = widget.collectDefectsOnComplete
+        ? await showFirmwareDefectsDialog(
+            context,
+            maxQuantity: flowOrder.productionQuantity.floor(),
+          )
+        : const <DefectRecord>[];
     if (!mounted || defects == null) return;
 
     final signature = await showFirmwarePinDialog(
       context,
       selectedOperation,
       defects: defects,
+      currentStage: widget.workStage,
     );
     if (!mounted || signature == null) return;
 
-    context.read<ProductionFlowStore>().completeStage(
+    await context.read<ProductionFlowStore>().completeStage(
       flowOrder.number,
       operatorName: signature.name,
       operatorPin: signature.pin,
+      defects: defects,
     );
+    if (!mounted) return;
     setState(() => _selectedIndex = 0);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${flowOrder.number} liberada para Soldagem.')),
+      SnackBar(
+        content: Text(
+          context
+                      .read<ProductionFlowStore>()
+                      .orders
+                      .firstWhere((o) => o.number == flowOrder.number)
+                      .currentStage ==
+                  flowOrder.currentStage
+              ? '${flowOrder.number}: sua participação foi concluída.'
+              : flowOrder.nextStage == ProductionStage.completed
+              ? '${flowOrder.number}: sequência concluída no VettiFlow.'
+              : '${flowOrder.number} liberada para ${flowOrder.nextStage.label}.',
+        ),
+      ),
     );
   }
 
@@ -135,6 +215,11 @@ class _FirmwarePageState extends State<FirmwarePage> {
       builder: (ctx) => _MobileActionSheet(
         operation: op,
         status: status,
+        startLabel: widget.startLabel,
+        resumeLabel: widget.resumeLabel,
+        completeLabel: widget.completeLabel,
+        pauseLabel: widget.pauseLabel,
+        completedLabel: widget.completedLabel,
         onStart: () {
           Navigator.pop(ctx);
           _startRecording();
@@ -157,8 +242,17 @@ class _FirmwarePageState extends State<FirmwarePage> {
 
   @override
   Widget build(BuildContext context) {
+    final currentOperator = context
+        .watch<OperatorAssignmentStore>()
+        .currentOperator;
+    final displayOperatorName = currentOperator?.stage == widget.workStage
+        ? currentOperator!.name
+        : widget.operatorName;
+    final displayOperatorRole = currentOperator?.stage == widget.workStage
+        ? currentOperator!.role
+        : widget.operatorRole;
     final flowOrders = context.watch<ProductionFlowStore>().ordersAtStage(
-      ProductionStage.firmware,
+      widget.stage,
     );
     if (_selectedIndex >= flowOrders.length && flowOrders.isNotEmpty) {
       _selectedIndex = flowOrders.length - 1;
@@ -178,12 +272,20 @@ class _FirmwarePageState extends State<FirmwarePage> {
 
         if (isMobile) {
           if (operations.isEmpty) {
-            return const _EmptyFirmwareStage(compact: true);
+            return _EmptyFirmwareStage(
+              compact: true,
+              title: widget.title,
+              operatorName: displayOperatorName,
+              operatorRole: displayOperatorRole,
+              emptyText: widget.emptyText,
+            );
           }
           return _MobileFirmwareLayout(
             operations: operations,
             selectedIndex: _selectedIndex,
             statuses: statuses,
+            title: widget.title,
+            operatorName: displayOperatorName,
             onSelect: (i) {
               _select(i);
               _showMobileActions(context);
@@ -192,12 +294,33 @@ class _FirmwarePageState extends State<FirmwarePage> {
         }
 
         if (operations.isEmpty) {
-          return const _EmptyFirmwareStage();
+          return _EmptyFirmwareStage(
+            title: widget.title,
+            operatorName: displayOperatorName,
+            operatorRole: displayOperatorRole,
+            emptyText: widget.emptyText,
+          );
         }
         return _DesktopFirmwareLayout(
           operations: operations,
           selectedIndex: _selectedIndex,
           statuses: statuses,
+          title: widget.title,
+          operatorName: displayOperatorName,
+          operatorRole: displayOperatorRole,
+          queueSubtitle: widget.queueSubtitle,
+          runningMetricLabel: widget.runningMetricLabel,
+          nextStageLabel: flowOrders[_selectedIndex].nextStageLabel,
+          startLabel: widget.startLabel,
+          resumeLabel: widget.resumeLabel,
+          completeLabel: widget.completeLabel,
+          pauseLabel: widget.pauseLabel,
+          waitingHint: widget.waitingHint,
+          runningHint: widget.runningHint,
+          pausedHint: widget.pausedHint,
+          completedLabel: widget.completedLabel,
+          stageIcon: widget.stageIcon,
+          accent: widget.accent,
           onSelect: _select,
           onStart: _startRecording,
           onPause: _pauseOperation,
@@ -217,6 +340,11 @@ class _MobileActionSheet extends StatelessWidget {
   const _MobileActionSheet({
     required this.operation,
     required this.status,
+    required this.startLabel,
+    required this.resumeLabel,
+    required this.completeLabel,
+    required this.pauseLabel,
+    required this.completedLabel,
     required this.onStart,
     required this.onPause,
     required this.onComplete,
@@ -225,6 +353,11 @@ class _MobileActionSheet extends StatelessWidget {
 
   final FirmwareOperation operation;
   final FirmwareStatus status;
+  final String startLabel;
+  final String resumeLabel;
+  final String completeLabel;
+  final String pauseLabel;
+  final String completedLabel;
   final VoidCallback onStart;
   final VoidCallback onPause;
   final VoidCallback onComplete;
@@ -297,6 +430,11 @@ class _MobileActionSheet extends StatelessWidget {
           OperationActions(
             status: status,
             compact: true,
+            startLabel: startLabel,
+            resumeLabel: resumeLabel,
+            completeLabel: completeLabel,
+            pauseLabel: pauseLabel,
+            completedLabel: completedLabel,
             onStart: onStart,
             onPause: onPause,
             onComplete: onComplete,
@@ -309,9 +447,19 @@ class _MobileActionSheet extends StatelessWidget {
 }
 
 class _EmptyFirmwareStage extends StatelessWidget {
-  const _EmptyFirmwareStage({this.compact = false});
+  const _EmptyFirmwareStage({
+    this.compact = false,
+    required this.title,
+    required this.operatorName,
+    required this.operatorRole,
+    required this.emptyText,
+  });
 
   final bool compact;
+  final String title;
+  final String operatorName;
+  final String operatorRole;
+  final String emptyText;
 
   @override
   Widget build(BuildContext context) {
@@ -329,19 +477,15 @@ class _EmptyFirmwareStage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(22),
               ),
               clipBehavior: Clip.antiAlias,
-              child: const Column(
+              child: Column(
                 children: [
                   VettiTopBar(
-                    title: 'Gravacao de Firmware',
-                    operatorName: 'Juliana',
+                    title: title,
+                    operatorName: operatorName,
                     compact: true,
                   ),
                   Expanded(
-                    child: Center(
-                      child: _EmptyStageMessage(
-                        text: 'Nenhuma OP aguardando firmware.',
-                      ),
-                    ),
+                    child: Center(child: _EmptyStageMessage(text: emptyText)),
                   ),
                 ],
               ),
@@ -351,21 +495,17 @@ class _EmptyFirmwareStage extends StatelessWidget {
       );
     }
 
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.pageBackground,
       body: Column(
         children: [
           VettiTopBar(
-            title: 'Gravacao de Firmware',
-            operatorName: 'Juliana',
-            operatorRole: 'Firmware',
+            title: title,
+            operatorName: operatorName,
+            operatorRole: operatorRole,
           ),
           Expanded(
-            child: Center(
-              child: _EmptyStageMessage(
-                text: 'Nenhuma OP aguardando firmware.',
-              ),
-            ),
+            child: Center(child: _EmptyStageMessage(text: emptyText)),
           ),
         ],
       ),
@@ -404,12 +544,16 @@ class _MobileFirmwareLayout extends StatelessWidget {
     required this.operations,
     required this.selectedIndex,
     required this.statuses,
+    required this.title,
+    required this.operatorName,
     required this.onSelect,
   });
 
   final List<FirmwareOperation> operations;
   final int selectedIndex;
   final Map<int, FirmwareStatus> statuses;
+  final String title;
+  final String operatorName;
   final ValueChanged<int> onSelect;
 
   @override
@@ -429,9 +573,9 @@ class _MobileFirmwareLayout extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                const VettiTopBar(
-                  title: 'Gravacao de Firmware',
-                  operatorName: 'Juliana',
+                VettiTopBar(
+                  title: title,
+                  operatorName: operatorName,
                   compact: true,
                 ),
                 Expanded(
@@ -490,6 +634,22 @@ class _DesktopFirmwareLayout extends StatelessWidget {
     required this.operations,
     required this.selectedIndex,
     required this.statuses,
+    required this.title,
+    required this.operatorName,
+    required this.operatorRole,
+    required this.queueSubtitle,
+    required this.runningMetricLabel,
+    required this.nextStageLabel,
+    required this.startLabel,
+    required this.resumeLabel,
+    required this.completeLabel,
+    required this.pauseLabel,
+    required this.waitingHint,
+    required this.runningHint,
+    required this.pausedHint,
+    required this.completedLabel,
+    required this.stageIcon,
+    required this.accent,
     required this.onSelect,
     required this.onStart,
     required this.onPause,
@@ -500,6 +660,22 @@ class _DesktopFirmwareLayout extends StatelessWidget {
   final List<FirmwareOperation> operations;
   final int selectedIndex;
   final Map<int, FirmwareStatus> statuses;
+  final String title;
+  final String operatorName;
+  final String operatorRole;
+  final String queueSubtitle;
+  final String runningMetricLabel;
+  final String nextStageLabel;
+  final String startLabel;
+  final String resumeLabel;
+  final String completeLabel;
+  final String pauseLabel;
+  final String waitingHint;
+  final String runningHint;
+  final String pausedHint;
+  final String completedLabel;
+  final IconData stageIcon;
+  final Color accent;
   final ValueChanged<int> onSelect;
   final VoidCallback onStart;
   final VoidCallback onPause;
@@ -521,11 +697,11 @@ class _DesktopFirmwareLayout extends StatelessWidget {
       CollaboratorStageMetric(
         label: 'OPs na etapa',
         value: '${operations.length}',
-        icon: Icons.memory_rounded,
-        accent: AppColors.primary,
+        icon: stageIcon,
+        accent: accent,
       ),
       CollaboratorStageMetric(
-        label: 'Em gravacao',
+        label: runningMetricLabel,
         value: '$recording',
         icon: Icons.play_circle_rounded,
         accent: AppColors.green,
@@ -536,11 +712,11 @@ class _DesktopFirmwareLayout extends StatelessWidget {
         icon: Icons.pause_circle_rounded,
         accent: AppColors.orange,
       ),
-      const CollaboratorStageMetric(
+      CollaboratorStageMetric(
         label: 'Proxima etapa',
-        value: 'Soldagem',
+        value: nextStageLabel,
         icon: Icons.precision_manufacturing,
-        accent: Color(0xFF7458D8),
+        accent: const Color(0xFF7458D8),
       ),
     ];
   }
@@ -551,10 +727,10 @@ class _DesktopFirmwareLayout extends StatelessWidget {
       backgroundColor: AppColors.pageBackground,
       body: Column(
         children: [
-          const VettiTopBar(
-            title: 'Gravacao de Firmware',
-            operatorName: 'Juliana',
-            operatorRole: 'Gravacao',
+          VettiTopBar(
+            title: title,
+            operatorName: operatorName,
+            operatorRole: operatorRole,
           ),
           Expanded(
             child: CollaboratorStageBody(
@@ -562,11 +738,13 @@ class _DesktopFirmwareLayout extends StatelessWidget {
                 metrics: metrics,
                 queue: CollaboratorPanel(
                   padding: const EdgeInsets.all(20),
-                  accent: AppColors.primary,
+                  accent: accent,
                   child: _DesktopOperationsPanel(
                     operations: operations,
                     selectedIndex: selectedIndex,
                     statuses: statuses,
+                    queueSubtitle: queueSubtitle,
+                    stageIcon: stageIcon,
                     onSelect: onSelect,
                   ),
                 ),
@@ -576,6 +754,14 @@ class _DesktopFirmwareLayout extends StatelessWidget {
                   child: _DesktopDetailPanel(
                     operation: selectedOperation,
                     status: status,
+                    startLabel: startLabel,
+                    resumeLabel: resumeLabel,
+                    completeLabel: completeLabel,
+                    pauseLabel: pauseLabel,
+                    waitingHint: waitingHint,
+                    runningHint: runningHint,
+                    pausedHint: pausedHint,
+                    completedLabel: completedLabel,
                     onStart: onStart,
                     onPause: onPause,
                     onComplete: onComplete,
@@ -596,12 +782,16 @@ class _DesktopOperationsPanel extends StatelessWidget {
     required this.operations,
     required this.selectedIndex,
     required this.statuses,
+    required this.queueSubtitle,
+    required this.stageIcon,
     required this.onSelect,
   });
 
   final List<FirmwareOperation> operations;
   final int selectedIndex;
   final Map<int, FirmwareStatus> statuses;
+  final String queueSubtitle;
+  final IconData stageIcon;
   final ValueChanged<int> onSelect;
 
   @override
@@ -610,9 +800,9 @@ class _DesktopOperationsPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         CollaboratorQueueHeading(
-          icon: Icons.memory_rounded,
+          icon: stageIcon,
           title: 'OPs disponiveis',
-          subtitle: 'Liberadas pela SMD para gravacao.',
+          subtitle: queueSubtitle,
           count: '${operations.length}',
         ),
         const SizedBox(height: 18),
@@ -634,6 +824,14 @@ class _DesktopDetailPanel extends StatelessWidget {
   const _DesktopDetailPanel({
     required this.operation,
     required this.status,
+    required this.startLabel,
+    required this.resumeLabel,
+    required this.completeLabel,
+    required this.pauseLabel,
+    required this.waitingHint,
+    required this.runningHint,
+    required this.pausedHint,
+    required this.completedLabel,
     required this.onStart,
     required this.onPause,
     required this.onComplete,
@@ -642,6 +840,14 @@ class _DesktopDetailPanel extends StatelessWidget {
 
   final FirmwareOperation operation;
   final FirmwareStatus status;
+  final String startLabel;
+  final String resumeLabel;
+  final String completeLabel;
+  final String pauseLabel;
+  final String waitingHint;
+  final String runningHint;
+  final String pausedHint;
+  final String completedLabel;
   final VoidCallback onStart;
   final VoidCallback onPause;
   final VoidCallback onComplete;
@@ -717,6 +923,11 @@ class _DesktopDetailPanel extends StatelessWidget {
         const SizedBox(height: 20),
         OperationActions(
           status: status,
+          startLabel: startLabel,
+          resumeLabel: resumeLabel,
+          completeLabel: completeLabel,
+          pauseLabel: pauseLabel,
+          completedLabel: completedLabel,
           onStart: onStart,
           onPause: onPause,
           onComplete: onComplete,
@@ -728,11 +939,9 @@ class _DesktopDetailPanel extends StatelessWidget {
 
   String _actionHint(FirmwareStatus status) {
     return switch (status) {
-      FirmwareStatus.waiting =>
-        'Inicie a gravacao para liberar as demais acoes.',
-      FirmwareStatus.recording =>
-        'Gravacao em andamento. Pause ou conclua a OP.',
-      FirmwareStatus.paused => 'OP pausada. Retome ou conclua a gravacao.',
+      FirmwareStatus.waiting => waitingHint,
+      FirmwareStatus.recording => runningHint,
+      FirmwareStatus.paused => pausedHint,
       FirmwareStatus.completed => 'OP finalizada nesta etapa.',
     };
   }

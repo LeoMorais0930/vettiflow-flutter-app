@@ -18,6 +18,12 @@ class DashboardState {
   final bool novaOPOpen;
   final bool confirmCancel;
   final bool filtrosOpen;
+  final bool databaseSyncing;
+  final String databaseSyncMessage;
+
+  /// Aviso de que a ultima OP aberta nao chegou ao Protheus. Vazio = tudo
+  /// certo. A tela mostra e limpa com [DashboardCubit.limparAvisoProtheus].
+  final String protheusAviso;
 
   const DashboardState({
     this.ordens = const [],
@@ -34,6 +40,9 @@ class DashboardState {
     this.novaOPOpen = false,
     this.confirmCancel = false,
     this.filtrosOpen = false,
+    this.databaseSyncing = false,
+    this.databaseSyncMessage = '',
+    this.protheusAviso = '',
   });
 
   List<OrdemProducao> get ordensFiltradas {
@@ -130,6 +139,9 @@ class DashboardState {
     bool? novaOPOpen,
     bool? confirmCancel,
     bool? filtrosOpen,
+    bool? databaseSyncing,
+    String? databaseSyncMessage,
+    String? protheusAviso,
   }) {
     return DashboardState(
       ordens: ordens ?? this.ordens,
@@ -146,6 +158,9 @@ class DashboardState {
       novaOPOpen: novaOPOpen ?? this.novaOPOpen,
       confirmCancel: confirmCancel ?? this.confirmCancel,
       filtrosOpen: filtrosOpen ?? this.filtrosOpen,
+      databaseSyncing: databaseSyncing ?? this.databaseSyncing,
+      databaseSyncMessage: databaseSyncMessage ?? this.databaseSyncMessage,
+      protheusAviso: protheusAviso ?? this.protheusAviso,
     );
   }
 }

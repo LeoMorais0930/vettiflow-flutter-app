@@ -1,115 +1,62 @@
 # VettiFlow Flutter App
 
-[Portugues](#portugues) | [English](#english)
+Aplicativo Flutter para acompanhar os setores da Vetti e consultar o Protheus DEV.
+A integração com o ERP é somente leitura. As operações locais do app continuam separadas dos documentos oficiais.
 
-## Portugues
+## Documentação
 
-Aplicacao Flutter para acompanhamento visual do fluxo de producao da VETTI. O projeto cria uma experiencia operacional responsiva para desktop, web e dispositivos moveis, com telas para painel, ordens de producao, etapas, operadores e acompanhamento em tempo real.
+Comece pelo [índice por setor](docs/README.md). O [guia de arquitetura](docs/desenvolvimento/arquitetura.md) explica o que está integrado e o que falta.
 
-### O problema
+## Executar localmente no Windows
 
-A operacao precisava de uma interface simples para visualizar ordens, status, prioridades e etapas sem depender de controles manuais espalhados.
+Pré-requisitos: Flutter no PATH, Python, driver ODBC para SQL Server e acesso à rede do DEV.
+Configure `api/.env` conforme [a documentação da API](api/README.md), sem substituir um arquivo já preenchido.
 
-### A solucao
-
-O VettiFlow Flutter App entrega uma base de frontend para uso interno, com:
-
-- Login e estrutura de rotas.
-- Dashboard com cards, tabela, kanban, filtros e KPIs.
-- Telas por etapa: firmware, solda, teste, almoxarifado, expedicao e fechamento.
-- Visao de TV/painel para acompanhamento coletivo.
-- Modelos e repositorios separados para evoluir de dados mockados/local storage para API real.
-- Tema visual centralizado e identidade VettiFlow.
-
-### Stack
-
-- Flutter / Dart
-- Flutter Web / PWA
-- BLoC, Provider e repositorios locais
-- Google Fonts e tema centralizado
-- Estrutura preparada para integracao com API .NET
-
-### Como rodar
+Na raiz, prepare dependências quando necessário:
 
 ```powershell
 flutter pub get
-flutter run -d web-server --web-hostname 127.0.0.1 --web-port 5174
+python -m venv api/venv
+.\api\venv\Scripts\python.exe -m pip install -r api/requirements.txt
 ```
 
-Abra:
-
-```text
-http://127.0.0.1:5174
-```
-
-### Estrutura principal
-
-```text
-lib/
-  app/
-  data/
-    models/
-    repositories/
-  shared/
-    layout/
-    models/
-    theme/
-  ui/
-    auth/
-    dashboard/
-    firmware/
-    soldering/
-    testing/
-    warehouse/
-    expedition/
-    closing/
-    tv/
-```
-
-### Status
-
-Projeto em evolucao para consolidar uma ferramenta interna de producao. A base atual prioriza fluxo, usabilidade, responsividade e separacao de responsabilidades para facilitar a integracao com backend.
-
-## English
-
-Flutter application for visual tracking of VETTI's production flow. The project provides a responsive operational experience for desktop, web, and mobile devices, with screens for dashboards, production orders, stages, operators, and real-time monitoring.
-
-### Problem
-
-The operation needed a simple interface to track orders, status, priorities, and stages without relying on scattered manual controls.
-
-### Solution
-
-VettiFlow Flutter App provides an internal frontend foundation with:
-
-- Login and route structure.
-- Dashboard with cards, table, kanban, filters, and KPIs.
-- Stage-oriented screens: firmware, soldering, testing, warehouse, expedition, and closing.
-- TV/dashboard view for shared production visibility.
-- Models and repositories separated to evolve from mocked/local data to a real API.
-- Centralized theme and VettiFlow visual identity.
-
-### Tech Stack
-
-- Flutter / Dart
-- Flutter Web / PWA
-- BLoC, Provider, and local repositories
-- Google Fonts and centralized theme
-- Structure prepared for .NET API integration
-
-### Running Locally
+Terminal 1, na raiz:
 
 ```powershell
-flutter pub get
-flutter run -d web-server --web-hostname 127.0.0.1 --web-port 5174
+.\api\venv\Scripts\python.exe -m uvicorn app.main:app --app-dir api --host 127.0.0.1 --port 8000
 ```
 
-Open:
+Terminal 2, na raiz:
 
-```text
-http://127.0.0.1:5174
+```powershell
+.\api\venv\Scripts\python.exe scripts/preparar_web_local.py
+flutter run -d web-server --web-hostname 127.0.0.1 --web-port 5174 --dart-define-from-file=.dart_tool/vettiflow-local-defines.json
 ```
 
-### Status
+Abra [VettiFlow](http://127.0.0.1:5174). O script reutiliza o token local da API sem imprimi-lo. O arquivo gerado fica em `.dart_tool`, ignorada pelo Git.
+Use Ctrl+C nos terminais para encerrar. Se as portas já estiverem ocupadas por uma instância do app, encerre essa instância antes de iniciar outra.
 
-Work in progress toward an internal production tool. The current version focuses on workflow, usability, responsiveness, and clean separation of responsibilities to make backend integration easier.
+## Organização
+
+- `lib/`: telas, modelos e repositórios Flutter.
+- `api/`: FastAPI e consultas ao SQL Server DEV.
+- `test/` e `api/tests/`: testes.
+- `docs/setores/`: funcionamento e pendências por setor.
+- `docs/desenvolvimento/`: arquitetura e padrão visual.
+- `docs/auditorias/` e `docs/pesquisa_protheus_2026-09-24/`: conclusões técnicas essenciais.
+- Relatórios antigos, capturas e dados brutos permanecem recuperáveis no histórico Git.
+
+## Verificar alterações
+
+```powershell
+flutter analyze --no-pub lib test
+flutter test --no-pub
+.\api\venv\Scripts\python.exe -m pytest api/tests -q
+```
+
+## Branches
+
+- `master`: base consolidada.
+- `developer`: trabalho diário, criada a partir da `master`.
+
+Veja [validação e pendências](docs/desenvolvimento/validacao.md) antes de publicar uma nova versão.

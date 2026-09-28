@@ -11,6 +11,11 @@ class OperationActions extends StatelessWidget {
     required this.onComplete,
     required this.onReset,
     this.compact = false,
+    this.startLabel = 'Iniciar gravacao',
+    this.resumeLabel = 'Retomar gravacao',
+    this.completeLabel = 'Concluir OP',
+    this.pauseLabel = 'Pausar OP',
+    this.completedLabel = 'OP concluida e enviada para a proxima etapa.',
   });
 
   final FirmwareStatus status;
@@ -19,6 +24,11 @@ class OperationActions extends StatelessWidget {
   final VoidCallback onComplete;
   final VoidCallback onReset;
   final bool compact;
+  final String startLabel;
+  final String resumeLabel;
+  final String completeLabel;
+  final String pauseLabel;
+  final String completedLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +36,7 @@ class OperationActions extends StatelessWidget {
 
     return switch (status) {
       FirmwareStatus.waiting => _ActionButton(
-        label: 'Iniciar gravacao',
+        label: startLabel,
         icon: Icons.play_arrow_rounded,
         onPressed: onStart,
         fillColor: AppColors.primary,
@@ -37,7 +47,7 @@ class OperationActions extends StatelessWidget {
       FirmwareStatus.recording => _ActionPair(
         height: height,
         primary: _ActionButton(
-          label: 'Concluir OP',
+          label: completeLabel,
           icon: Icons.check_rounded,
           onPressed: onComplete,
           fillColor: AppColors.green,
@@ -45,7 +55,7 @@ class OperationActions extends StatelessWidget {
           height: height,
         ),
         secondary: _ActionButton(
-          label: 'Pausar OP',
+          label: pauseLabel,
           icon: Icons.pause_rounded,
           onPressed: onPause,
           foregroundColor: AppColors.orangeText,
@@ -56,7 +66,7 @@ class OperationActions extends StatelessWidget {
       FirmwareStatus.paused => _ActionPair(
         height: height,
         primary: _ActionButton(
-          label: 'Retomar gravacao',
+          label: resumeLabel,
           icon: Icons.play_arrow_rounded,
           onPressed: onStart,
           fillColor: AppColors.primary,
@@ -64,7 +74,7 @@ class OperationActions extends StatelessWidget {
           height: height,
         ),
         secondary: _ActionButton(
-          label: 'Concluir OP',
+          label: completeLabel,
           icon: Icons.check_rounded,
           onPressed: onComplete,
           foregroundColor: AppColors.green,
@@ -76,6 +86,7 @@ class OperationActions extends StatelessWidget {
         height: height,
         compact: compact,
         onReset: onReset,
+        label: completedLabel,
       ),
     };
   }
@@ -112,11 +123,13 @@ class _CompletedBanner extends StatelessWidget {
     required this.height,
     required this.compact,
     required this.onReset,
+    required this.label,
   });
 
   final double height;
   final bool compact;
   final VoidCallback onReset;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -140,7 +153,7 @@ class _CompletedBanner extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'OP concluida e enviada para a proxima etapa.',
+                  label,
                   style: TextStyle(
                     color: AppColors.green,
                     fontSize: compact ? 12 : 13,

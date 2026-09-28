@@ -21,7 +21,6 @@ class SolderingOperation {
     required this.receivedAgo,
     required this.board,
     required this.lot,
-    required this.profile,
   });
 
   final String number;
@@ -32,7 +31,6 @@ class SolderingOperation {
   final String receivedAgo;
   final String board;
   final String lot;
-  final String profile;
 }
 
 enum SolderingStatus {
@@ -78,6 +76,18 @@ class SolderingPage extends StatefulWidget {
 
 class _SolderingPageState extends State<SolderingPage> {
   var _selectedIndex = 0;
+  bool _initialSelectionApplied = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialSelectionApplied) return;
+    _initialSelectionApplied = true;
+    final number = ModalRoute.of(context)?.settings.arguments;
+    if (number is! String) return;
+    final index = _flowOrders().indexWhere((order) => order.number == number);
+    if (index >= 0) _selectedIndex = index;
+  }
 
   List<ProductionOrderFlow> _flowOrders() => context
       .read<ProductionFlowStore>()
@@ -102,7 +112,7 @@ class _SolderingPageState extends State<SolderingPage> {
     return SolderingOperation(
       number: order.number,
       product: order.productLabel,
-      quantity: order.quantityLabel,
+      quantity: order.productionQuantityLabel,
       origin: 'Firmware',
       receivedAt: _clockLabel(order.updatedAt),
       receivedAgo: timing?.startedAt == null
@@ -110,9 +120,6 @@ class _SolderingPageState extends State<SolderingPage> {
           : 'Tempo na etapa: ${formatProductionDuration(elapsed)}',
       board: board,
       lot: 'OP ${order.number}',
-      profile: order.productCode.contains('SMART')
-          ? 'SMD complementar'
-          : 'Manual fino',
     );
   }
 
@@ -129,13 +136,13 @@ class _SolderingPageState extends State<SolderingPage> {
     setState(() => _selectedIndex = index);
   }
 
-  void _startOperation() {
+  Future<void> _startOperation() async {
     final order = _selectedFlowOrder();
     if (order == null) return;
     final operator = context.read<OperatorAssignmentStore>().currentOperator;
-    context.read<ProductionFlowStore>().startStage(
+    await context.read<ProductionFlowStore>().startStage(
       order.number,
-      operatorName: operator?.name ?? 'Bryan',
+      operatorName: operator?.name ?? 'Operador',
       operatorPin: operator?.pin,
     );
   }
@@ -146,10 +153,10 @@ class _SolderingPageState extends State<SolderingPage> {
     final request = await showPauseReasonDialog(
       context,
       stage: ProductionStage.soldering,
-      maxQuantity: order.quantity,
+      maxQuantity: order.productionQuantity.floor(),
     );
     if (!mounted || request == null) return;
-    context.read<ProductionFlowStore>().pauseStage(
+    await context.read<ProductionFlowStore>().pauseStage(
       order.number,
       operatorName: request.operatorName,
       operatorPin: request.operatorPin,
@@ -166,13 +173,16 @@ class _SolderingPageState extends State<SolderingPage> {
     final signature = await showSolderingPinDialog(context, operation);
     if (!mounted || signature == null) return;
 
-    context.read<ProductionFlowStore>().completeStage(
+    await context.read<ProductionFlowStore>().completeStage(
       flowOrder.number,
       operatorName: signature.name,
       operatorPin: signature.pin,
     );
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${operation.number} enviada para teste.')),
+      SnackBar(
+        content: Text('${operation.number}: sessão concluída no VettiFlow.'),
+      ),
     );
   }
 
@@ -283,14 +293,19 @@ class _EmptySolderingStage extends StatelessWidget {
               borderRadius: BorderRadius.circular(compact ? 22 : 0),
             ),
             clipBehavior: Clip.antiAlias,
-            child: const Column(
+            child: Column(
               children: [
                 VettiTopBar(
                   title: 'Soldagem',
-                  operatorName: 'Bryan',
+                  operatorName:
+                      context
+                          .watch<OperatorAssignmentStore>()
+                          .currentOperator
+                          ?.name ??
+                      'Operador',
                   operatorRole: 'Soldagem',
                 ),
-                Expanded(
+                const Expanded(
                   child: _EmptyStageMessage(
                     icon: Icons.memory_rounded,
                     title: 'Nenhuma OP em soldagem',
@@ -472,9 +487,14 @@ class _MobileSolderingLayout extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                const VettiTopBar(
+                VettiTopBar(
                   title: 'Soldagem',
-                  operatorName: 'Bryan',
+                  operatorName:
+                      context
+                          .watch<OperatorAssignmentStore>()
+                          .currentOperator
+                          ?.name ??
+                      'Operador',
                   compact: true,
                 ),
                 Expanded(
@@ -553,9 +573,14 @@ class _DesktopSolderingLayout extends StatelessWidget {
       backgroundColor: AppColors.pageBackground,
       body: Column(
         children: [
-          const VettiTopBar(
+          VettiTopBar(
             title: 'Soldagem',
-            operatorName: 'Bryan',
+            operatorName:
+                context
+                    .watch<OperatorAssignmentStore>()
+                    .currentOperator
+                    ?.name ??
+                'Operador',
             operatorRole: 'Soldagem',
           ),
           Expanded(
@@ -644,7 +669,7 @@ class _DesktopSolderingQueue extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Liberadas pela gravacao para retrabalho de bancada.',
+            'Liberadas pela gravacao para a proxima etapa.',
             style: TextStyle(color: AppColors.muted, fontSize: 12),
           ),
           const SizedBox(height: 18),
@@ -762,10 +787,10 @@ class _DesktopSolderingDetail extends StatelessWidget {
       SolderingStatus.waiting =>
         'Inicie a soldagem para liberar pausa e envio.',
       SolderingStatus.active =>
-        'Soldagem em andamento. Pause ou envie para teste.',
+        'Soldagem em andamento. Pause ou conclua a etapa.',
       SolderingStatus.paused =>
-        'OP pausada. Retome a bancada ou envie com assinatura.',
-      SolderingStatus.completed => 'OP enviada para a etapa de teste.',
+        'OP pausada. Retome a etapa ou envie com assinatura.',
+      SolderingStatus.completed => 'Etapa concluída.',
     };
   }
 }
@@ -1029,11 +1054,7 @@ class _BoardInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = [
-      ('Placa', operation.board),
-      ('Lote', operation.lot),
-      ('Perfil', operation.profile),
-    ];
+    final items = [('Placa', operation.board), ('Lote', operation.lot)];
 
     return Wrap(
       spacing: 10,
@@ -1110,7 +1131,7 @@ class _SolderingActions extends StatelessWidget {
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'OP assinada e enviada para teste.',
+                'Etapa assinada no VettiFlow.',
                 style: TextStyle(
                   color: AppColors.green,
                   fontSize: 13,
@@ -1380,7 +1401,7 @@ class _SolderingPinSheetState extends State<_SolderingPinSheet> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Digite o PIN para enviar a ${widget.operation.number} para teste.',
+            'Digite o PIN para concluir a soldagem da ${widget.operation.number}.',
             style: const TextStyle(color: AppColors.muted, fontSize: 13),
           ),
           const SizedBox(height: 24),

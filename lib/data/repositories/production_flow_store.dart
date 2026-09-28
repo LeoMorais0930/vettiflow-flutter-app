@@ -1,184 +1,61 @@
+import 'package:vetti_flow_1_0/shared/models/operator_access.dart';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:vetti_flow_1_0/data/models/production_flow.dart';
+import 'package:vetti_flow_1_0/data/models/warehouse_request.dart';
+import 'package:vetti_flow_1_0/data/repositories/production_flow_database.dart';
 import 'package:vetti_flow_1_0/data/repositories/production_flow_persistence.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_order_publisher.dart';
+import 'package:vetti_flow_1_0/shared/models/finished_goods_routing.dart';
+import 'package:vetti_flow_1_0/shared/models/operator.dart';
 
 class ProductionFlowStore extends ChangeNotifier {
-  ProductionFlowStore() {
+  ProductionFlowStore({
+    this.database = const EmptyProductionFlowDatabase(),
+    this.protheusPublisher,
+    this.filial = '04',
+    ProductionFlowPersistence? persistence,
+    List<ProductionOrderFlow> seedOrders = const [],
+  }) : _persistence = persistence ?? ProductionFlowPersistence() {
     if (!_restore(_persistence.read())) {
-      _orders.addAll(_seedOrders());
+      _orders.addAll(seedOrders);
       _persist();
     }
+    _loadFromDatabase();
     _persistence.listen((payload) {
       if (_restore(payload)) notifyListeners();
     });
   }
 
-  final _persistence = ProductionFlowPersistence();
+  final ProductionFlowDatabase database;
+
+  /// Quem transforma a abertura de OP em rascunho local Protheus.
+  /// Nulo desliga qualquer publicacao e e o padrao seguro do app.
+  final ProtheusOrderPublisher? protheusPublisher;
+  final String filial;
+
+  final ProductionFlowPersistence _persistence;
+  final _smdBusy = <String>{};
+  final _mutationBusy = <String>{};
   final _orders = <ProductionOrderFlow>[];
+  final _catalogOverrides = <String, ProductionCatalogItem>{};
+  final _protheusOutcomes = <String, ProtheusPublishOutcome>{};
   var _nextSequence = 564351;
 
-  static const catalog = [
-    ProductionCatalogItem(
-      code: 'SMARTALARM32-V6',
-      name: 'Central SmartAlarm32 V6.68',
-      defaultQuantity: 500,
-      components: [
-        ProductionComponent(
-          code: 'PCI-SA32-V6',
-          description: 'Placa principal SmartAlarm32 V6',
-          quantity: 1,
-          stock: 74,
-        ),
-        ProductionComponent(
-          code: 'MOD-EG912Y',
-          description: 'Modulo modem EG912Y',
-          quantity: 1,
-          stock: 38,
-        ),
-        ProductionComponent(
-          code: 'RF-SI4463',
-          description: 'Modulo RF Si4463',
-          quantity: 1,
-          stock: 112,
-        ),
-      ],
-    ),
-    ProductionCatalogItem(
-      code: 'CR4',
-      name: 'Modulo de 4 zonas com fio',
-      defaultQuantity: 3000,
-      components: [
-        ProductionComponent(
-          code: 'PCI-CR4',
-          description: 'PCI CR4 v2.1',
-          quantity: 1,
-          stock: 220,
-        ),
-        ProductionComponent(
-          code: 'CN-004V',
-          description: 'Conector barra 4 vias',
-          quantity: 4,
-          stock: 860,
-        ),
-      ],
-    ),
-    ProductionCatalogItem(
-      code: 'CR8',
-      name: 'Modulo de 8 zonas com fio',
-      defaultQuantity: 1200,
-      components: [
-        ProductionComponent(
-          code: 'PCI-CR8',
-          description: 'PCI CR8',
-          quantity: 1,
-          stock: 96,
-        ),
-        ProductionComponent(
-          code: 'CN-008V',
-          description: 'Conector barra 8 vias',
-          quantity: 4,
-          stock: 420,
-        ),
-      ],
-    ),
-    ProductionCatalogItem(
-      code: 'MAG-CURTO',
-      name: 'Sensor magnetico alcance curto',
-      defaultQuantity: 900,
-      components: [
-        ProductionComponent(
-          code: 'REED-MAG',
-          description: 'Chave reed magnetica',
-          quantity: 1,
-          stock: 1800,
-        ),
-        ProductionComponent(
-          code: 'BAT-CR2032',
-          description: 'Bateria CR2032',
-          quantity: 1,
-          stock: 2400,
-        ),
-      ],
-    ),
-    ProductionCatalogItem(
-      code: 'INFRA-LONGO',
-      name: 'Sensor infravermelho alcance longo',
-      defaultQuantity: 650,
-      components: [
-        ProductionComponent(
-          code: 'PIR-LR',
-          description: 'Elemento PIR longo alcance',
-          quantity: 1,
-          stock: 760,
-        ),
-        ProductionComponent(
-          code: 'LENTE-PIR',
-          description: 'Lente fresnel PIR',
-          quantity: 1,
-          stock: 830,
-        ),
-      ],
-    ),
-    ProductionCatalogItem(
-      code: 'SIRENE-SF',
-      name: 'Sirene sem fio',
-      defaultQuantity: 300,
-      components: [
-        ProductionComponent(
-          code: 'BUZZ-12V',
-          description: 'Transdutor sonoro 12V',
-          quantity: 1,
-          stock: 410,
-        ),
-        ProductionComponent(
-          code: 'RF-SI4463',
-          description: 'Modulo RF Si4463',
-          quantity: 1,
-          stock: 112,
-        ),
-      ],
-    ),
-    ProductionCatalogItem(
-      code: 'SMART-TECLADO',
-      name: 'Teclado inteligente',
-      defaultQuantity: 450,
-      components: [
-        ProductionComponent(
-          code: 'PCI-TCL-SMART',
-          description: 'PCI teclado inteligente',
-          quantity: 1,
-          stock: 128,
-        ),
-        ProductionComponent(
-          code: 'DISPLAY-OLED',
-          description: 'Display OLED compacto',
-          quantity: 1,
-          stock: 210,
-        ),
-      ],
-    ),
-    ProductionCatalogItem(
-      code: 'BOTAO-PANICO',
-      name: 'Botao de panico',
-      defaultQuantity: 800,
-      components: [
-        ProductionComponent(
-          code: 'PCI-PANICO',
-          description: 'PCI botao panico RF',
-          quantity: 1,
-          stock: 330,
-        ),
-        ProductionComponent(
-          code: 'SW-TATIL',
-          description: 'Chave tatil reforcada',
-          quantity: 1,
-          stock: 1900,
-        ),
-      ],
-    ),
+  /// Como ficou o rascunho Protheus da OP. `null` quando nao houve tentativa.
+  ///
+  /// Vale ler logo depois de [createOrder]: ele so retorna depois de tentar.
+  ProtheusPublishOutcome? protheusOutcome(String number) =>
+      _protheusOutcomes[number];
+
+  /// OPs criadas com rascunho local que nao chegou ao Protheus.
+  List<String> get ordersNotInProtheus => [
+    for (final entry in _protheusOutcomes.entries)
+      if (!entry.value.gravouNoProtheus) entry.key,
   ];
+
+  static const catalog = <ProductionCatalogItem>[];
 
   List<ProductionOrderFlow> get orders => List.unmodifiable(_orders);
 
@@ -196,46 +73,142 @@ class ProductionFlowStore extends ChangeNotifier {
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
+  List<ProductionCatalogItem> get catalogItems {
+    final items = <String, ProductionCatalogItem>{
+      for (final item in catalog) item.code: item,
+      ..._catalogOverrides,
+    };
+    return items.values.toList()..sort((a, b) => a.code.compareTo(b.code));
+  }
+
   ProductionCatalogItem catalogItem(String code) {
+    final normalizedCode = code.trim();
+    final override = _catalogOverrides[normalizedCode];
+    if (override != null) return override;
     return catalog.firstWhere(
       (item) => item.code == code,
-      orElse: () => catalog.first,
+      orElse: () => ProductionCatalogItem(
+        code: normalizedCode,
+        name: normalizedCode,
+        defaultQuantity: 1,
+        components: const [],
+      ),
     );
   }
 
-  ProductionOrderFlow createOrder({
+  Future<ProductionOrderFlow> createOrder({
     required String productCode,
+    String? productName,
+    String? productUnit,
+    List<ProductionComponent> components = const [],
     required int quantity,
     required String priority,
     required String operatorName,
     String? responsavel,
     String? prazo,
-  }) {
+    String orderWarehouse = '',
+    ProductionStage initialStage = ProductionStage.warehouse,
+    List<ProductionStage> plannedStages = const [],
+    String? operatorPin,
+  }) async {
+    if (plannedStages.any((stage) => !_isRoutableStage(stage)) ||
+        plannedStages.toSet().length != plannedStages.length) {
+      throw ArgumentError('Escolha etapas válidas, sem repetição.');
+    }
+    final route = plannedStages.isNotEmpty
+        ? [...plannedStages]
+        : ProductionStage.productionFlow
+              .where((s) => s.progressIndex >= initialStage.progressIndex)
+              .toList();
     final now = DateTime.now();
-    final product = catalogItem(productCode);
-    final number = 'OP-${now.year}-${_nextSequence++}';
+    final existing = catalogItem(productCode);
+    final product = ProductionCatalogItem(
+      code: productCode,
+      name: productName?.trim().isNotEmpty == true
+          ? productName!.trim()
+          : existing.name,
+      defaultQuantity: quantity,
+      components: components.isNotEmpty ? components : existing.components,
+      unit: productUnit?.trim().isNotEmpty == true
+          ? productUnit!.trim()
+          : existing.unit,
+    );
+    if (_requiresProtheusSignature(product.components) &&
+        !_hasPin(operatorPin)) {
+      throw StateError('Informe o PIN para movimentar o Protheus.');
+    }
+    _catalogOverrides[product.code] = product;
+    final number = 'OP-${now.year}-${await _reserveSequence()}';
     final order = ProductionOrderFlow(
       number: number,
       productCode: product.code,
       productName: product.name,
       quantity: quantity,
-      currentStage: ProductionStage.warehouse,
+      unit: product.unit,
+      currentStage: route.isEmpty ? initialStage : route.first,
+      plannedStages: route,
       status: ProductionRunStatus.waiting,
       priority: priority,
       createdAt: now,
       updatedAt: now,
       operatorName: operatorName,
+      operatorPin: operatorPin,
       responsavel: responsavel,
       prazo: prazo,
+      orderWarehouse: orderWarehouse,
     );
     _orders.insert(0, order);
     _persist();
     notifyListeners();
+    await _syncOrder(order, 'created');
+    await _publishToProtheus(order, product);
     return order;
   }
 
-  void startStage(String number, {String? operatorName, String? operatorPin}) {
-    _mutate(number, (order, now) {
+  /// Tenta registrar a OP como rascunho local Protheus e guarda o resultado.
+  ///
+  /// Nao propaga excecao de proposito: a OP ja existe no fluxo do app e nao
+  /// pode sumir porque a API caiu. O que nao pode acontecer e ficar em
+  /// silencio - por isso o resultado fica em [protheusOutcome] para a tela
+  /// avisar.
+  Future<void> _publishToProtheus(
+    ProductionOrderFlow order,
+    ProductionCatalogItem product,
+  ) async {
+    final publisher = protheusPublisher;
+    if (publisher == null) return;
+
+    ProtheusPublishOutcome outcome;
+    try {
+      outcome = await publisher.publishOrder(
+        order: order,
+        product: product,
+        filial: filial,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Erro no rascunho Protheus ${order.number}: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      outcome = ProtheusPublishOutcome.naFila(mutationId: '', motivo: '$error');
+    }
+
+    _protheusOutcomes[order.number] = outcome;
+    notifyListeners();
+  }
+
+  Future<void> startStage(
+    String number, {
+    String? operatorName,
+    String? operatorPin,
+  }) {
+    return _mutate(number, (order, now) {
+      if (ProductionOrderFlow.internalProductionStages.contains(
+            order.currentStage,
+          ) &&
+          order.productionQuantity <= 0) {
+        throw StateError(
+          'Não há quantidade na produção. Confira os envios e devoluções.',
+        );
+      }
       final timings = Map<ProductionStage, ProductionStageTiming>.from(
         order.timings,
       );
@@ -280,6 +253,10 @@ class ProductionFlowStore extends ChangeNotifier {
         status: ProductionRunStatus.active,
         updatedAt: now,
         operatorName: () => operatorName ?? order.operatorName,
+        responsavel: () {
+          final name = operatorName?.trim();
+          return name == null || name.isEmpty ? order.responsavel : name;
+        },
         timings: timings,
         operatorSessions: sessions,
         pauseEvents: pauseEvents,
@@ -287,7 +264,7 @@ class ProductionFlowStore extends ChangeNotifier {
     });
   }
 
-  void pauseStage(
+  Future<void> pauseStage(
     String number, {
     String? operatorName,
     String? operatorPin,
@@ -295,7 +272,7 @@ class ProductionFlowStore extends ChangeNotifier {
     String? customReason,
     int producedQuantity = 0,
   }) {
-    _mutate(number, (order, now) {
+    return _mutate(number, (order, now) {
       final timings = Map<ProductionStage, ProductionStageTiming>.from(
         order.timings,
       );
@@ -354,8 +331,8 @@ class ProductionFlowStore extends ChangeNotifier {
     });
   }
 
-  void resetStage(String number) {
-    _mutate(number, (order, now) {
+  Future<void> resetStage(String number) {
+    return _mutate(number, (order, now) {
       return order.copyWith(
         status: ProductionRunStatus.waiting,
         updatedAt: now,
@@ -364,9 +341,21 @@ class ProductionFlowStore extends ChangeNotifier {
   }
 
   /// Volta a OP para a etapa anterior do fluxo (usado pelo dashboard).
-  void regressStage(String number) {
-    _mutate(number, (order, now) {
-      final previous = _previousStage(order.currentStage);
+  Future<void> regressStage(String number) {
+    return _mutate(number, (order, now) {
+      final routeIndex = order.plannedStages.indexOf(order.currentStage);
+      final previous = order.plannedStages.isEmpty
+          ? _previousStage(order.currentStage)
+          : order.isDone
+          ? order.plannedStages.last
+          : routeIndex > 0
+          ? order.plannedStages[routeIndex - 1]
+          : order.currentStage;
+      if (previous == ProductionStage.smd && order.smd.completedAt != null) {
+        throw StateError(
+          'O SMD já foi concluído. Retrabalho precisa de uma nova programação.',
+        );
+      }
       final timings = Map<ProductionStage, ProductionStageTiming>.from(
         order.timings,
       )..remove(order.currentStage);
@@ -374,27 +363,584 @@ class ProductionFlowStore extends ChangeNotifier {
         currentStage: previous,
         status: ProductionRunStatus.waiting,
         updatedAt: now,
+        responsavel: () => null,
         timings: timings,
       );
     });
   }
 
   /// Remove a OP do fluxo (cancelamento pelo dashboard).
-  void cancelOrder(String number) {
+  Future<void> cancelOrder(
+    String number, {
+    Map<String, String> returnWarehouses = const {},
+    String? operatorName,
+    String? operatorPin,
+  }) async {
+    if (_smdBusy.contains(number) || _mutationBusy.contains(number)) {
+      throw StateError('Aguarde o registro anterior desta OP terminar.');
+    }
     final index = _orders.indexWhere((order) => order.number == number);
     if (index == -1) return;
-    _orders.removeAt(index);
-    _persist();
-    notifyListeners();
+    final order = _orders[index];
+    if (order.dispatchDrafts.isNotEmpty) {
+      throw StateError(
+        'Esta OP tem histórico de preparos de envio e não pode ser excluída.',
+      );
+    }
+    final item = catalogItem(order.productCode);
+    if (_requiresProtheusSignature(item.components) && !_hasPin(operatorPin)) {
+      throw StateError('Informe o PIN para cancelar e devolver no Protheus.');
+    }
+    _mutationBusy.add(number);
+    try {
+      await database.deleteOrder(
+        number,
+        order: order.copyWith(updatedAt: DateTime.now()),
+        catalogItem: item,
+        returnWarehouses: returnWarehouses,
+        operatorName: operatorName,
+        operatorPin: operatorPin,
+      );
+      _orders.removeWhere((o) => o.number == number);
+      _persist();
+      notifyListeners();
+    } finally {
+      _mutationBusy.remove(number);
+    }
   }
 
-  void completeStage(
+  Future<void> updatePlannedStages(
+    String number,
+    List<ProductionStage> stages,
+  ) {
+    return _mutate(number, (order, now) {
+      final validStages = _sanitizePlannedStages(order.currentStage, stages);
+      final currentIndex = validStages.indexOf(order.currentStage);
+      if (order.smd.completedAt != null &&
+          currentIndex >= 0 &&
+          validStages.indexOf(ProductionStage.smd) > currentIndex) {
+        throw StateError(
+          'O SMD já foi concluído. Retrabalho precisa de uma nova programação.',
+        );
+      }
+      return order.copyWith(plannedStages: validStages, updatedAt: now);
+    });
+  }
+
+  bool canPointSmd(Operator? operator) =>
+      operator != null &&
+      (operator.area == WorkArea.smd ||
+          (operator.area == WorkArea.system && operator.canManageAssignments));
+
+  Future<void> releaseWarehouseOrder(
+    String number, {
+    required Operator operator,
+    required List<WarehouseConfirmationRequest> requests,
+  }) async {
+    if (!_orders.any((o) => o.number == number)) {
+      throw StateError('OP não encontrada.');
+    }
+    if (!(operator.area == WorkArea.warehouse ||
+        operator.area == WorkArea.system && operator.canManageAssignments)) {
+      throw StateError(
+        'Somente o almoxarifado ou a administração pode liberar.',
+      );
+    }
+    await _mutate(number, (order, now) {
+      if (order.currentStage != ProductionStage.warehouse) {
+        throw StateError('Esta OP já saiu do almoxarifado.');
+      }
+      if (requests.any(
+        (r) =>
+            r.orderNumber == number && !r.manual && r.remainingQuantity > 1e-8,
+      )) {
+        throw StateError(
+          'Conclua a entrega dos materiais ou cancele o saldo não utilizado antes de liberar.',
+        );
+      }
+      return order.copyWith(
+        currentStage: order.nextStage,
+        status: order.nextStage == ProductionStage.completed
+            ? ProductionRunStatus.completed
+            : ProductionRunStatus.waiting,
+        updatedAt: now,
+        responsavel: () => null,
+        lastObservation: () => 'Liberação do almoxarifado por ${operator.name}',
+        warehouseReleases: List.unmodifiable([
+          ...order.warehouseReleases,
+          WarehouseRelease(
+            at: now,
+            operatorName: operator.name,
+            operatorUsername: operator.username,
+            destination: order.nextStage,
+          ),
+        ]),
+      );
+    }, localOnly: true);
+  }
+
+  bool canPrepareProductionDispatch(Operator? operator) =>
+      operator != null &&
+      (operator.area == WorkArea.production &&
+              operator.stage != WorkStage.expedition ||
+          operator.area == WorkArea.system && operator.canManageAssignments);
+
+  Future<void> prepareProductionDispatch(
+    String number, {
+    required Operator operator,
+    required String entryId,
+    required String destination,
+    required num quantity,
+    required String reason,
+  }) async {
+    if (!canPrepareProductionDispatch(operator)) {
+      throw StateError(
+        'Somente a produção ou a administração pode preparar envios.',
+      );
+    }
+    if (!_orders.any((o) => o.number == number)) {
+      throw StateError('OP não encontrada.');
+    }
+    await _mutate(number, (order, now) {
+      final previous = order.dispatchDrafts
+          .where((d) => d.id == entryId)
+          .firstOrNull;
+      if (previous != null) {
+        if (previous.quantity == quantity &&
+            previous.destination == destination &&
+            previous.reason == reason.trim() &&
+            previous.operatorUsername == operator.username) {
+          return order;
+        }
+        throw StateError('Este preparo já foi registrado com outros dados.');
+      }
+      if (entryId.trim().isEmpty ||
+          reason.trim().isEmpty ||
+          reason.trim().length > 300 ||
+          !ProductionDispatchDraft.destinations.containsKey(destination)) {
+        throw StateError('Informe destino e motivo válidos.');
+      }
+      if (!order.canPrepareDispatch) {
+        throw StateError(
+          'Confira etapa, armazém 05, unidade e quantidade disponível da OP.',
+        );
+      }
+      final available = order.availableToPrepare;
+      if (!quantity.isFinite || quantity <= 0 || quantity > available) {
+        throw StateError(
+          'A quantidade não pode ultrapassar o disponível para preparar.',
+        );
+      }
+      return order.copyWith(
+        updatedAt: now,
+        dispatchDrafts: List.unmodifiable([
+          ...order.dispatchDrafts,
+          ProductionDispatchDraft(
+            id: entryId,
+            quantity: quantity,
+            destination: destination,
+            createdAt: now,
+            operatorName: operator.name,
+            operatorUsername: operator.username,
+            stage: order.currentStage.name,
+            reason: reason.trim(),
+          ),
+        ]),
+      );
+    }, localOnly: true);
+  }
+
+  Future<void> cancelProductionDispatch(
+    String number, {
+    required Operator operator,
+    required String entryId,
+    required String reason,
+  }) async {
+    if (!canPrepareProductionDispatch(operator)) {
+      throw StateError(
+        'Somente a produção ou a administração pode cancelar preparos.',
+      );
+    }
+    if (!_orders.any((o) => o.number == number)) {
+      throw StateError('OP não encontrada.');
+    }
+    await _mutate(number, (order, now) {
+      if (reason.trim().isEmpty || reason.trim().length > 300) {
+        throw StateError(
+          'Informe o motivo do cancelamento, com até 300 caracteres.',
+        );
+      }
+      final draft = order.dispatchDrafts
+          .where((d) => d.id == entryId)
+          .firstOrNull;
+      if (draft == null) throw StateError('Preparo não encontrado.');
+      if (draft.isCancelled) return order;
+      if (draft.delivered > 0) {
+        throw StateError(
+          'Já houve entrega. Cancele somente o restante do preparo.',
+        );
+      }
+      return order.copyWith(
+        updatedAt: now,
+        dispatchDrafts: List.unmodifiable([
+          for (final d in order.dispatchDrafts)
+            if (d.id == entryId)
+              d.cancel(now, operator.name, reason.trim())
+            else
+              d,
+        ]),
+      );
+    }, localOnly: true);
+  }
+
+  bool canRecordDispatch(
+    Operator? operator,
+    ProductionDispatchDraft draft,
+    DispatchAction action,
+  ) {
+    if (operator == null) return false;
+    if (operator.area == WorkArea.system && operator.canManageAssignments) {
+      return true;
+    }
+    final sector = action.sector == 'destination'
+        ? (draft.isSupport ? 'support' : 'expedition')
+        : action.sector;
+    return switch (sector) {
+      'production' => canPrepareProductionDispatch(operator),
+      'support' => operator.area == WorkArea.support,
+      'expedition' => operator.canOperate(AppSector.expedition),
+      _ => false,
+    };
+  }
+
+  Future<void> recordDispatchEvent(
+    String number, {
+    required String draftId,
+    required String eventId,
+    required DispatchAction action,
+    required num quantity,
+    required String note,
+    required Operator operator,
+    ProductionStage? returnStage,
+    String reference = '',
+  }) async {
+    if (!_orders.any((o) => o.number == number)) {
+      throw StateError('OP não encontrada.');
+    }
+    await _mutate(number, (order, now) {
+      final draft = order.dispatchDrafts
+          .where((d) => d.id == draftId)
+          .firstOrNull;
+      if (draft == null || !canRecordDispatch(operator, draft, action)) {
+        throw StateError(
+          'Esta ação pertence ao setor responsável pela movimentação.',
+        );
+      }
+      final existing = draft.events.where((e) => e.id == eventId).firstOrNull;
+      if (existing != null) {
+        if (existing.action == action &&
+            existing.quantity == quantity &&
+            existing.note == note.trim() &&
+            existing.operatorUsername == operator.username &&
+            existing.stage == (returnStage?.name ?? '') &&
+            existing.reference == reference.trim()) {
+          return order;
+        }
+        throw StateError('Este registro já existe com outros dados.');
+      }
+      if (eventId.trim().isEmpty ||
+          note.trim().isEmpty ||
+          note.trim().length > 500 ||
+          reference.length > 120) {
+        throw StateError('Informe o motivo ou resultado (até 500 caracteres).');
+      }
+      final limit = draft.limitFor(action);
+      if (draft.isCancelled ||
+          limit <= 0 ||
+          !quantity.isFinite ||
+          (action.requiresQuantity
+              ? quantity <= 0 || quantity > limit
+              : quantity != 0)) {
+        throw StateError('Confira a quantidade disponível para esta ação.');
+      }
+      if (action.sector == 'support' && !draft.isSupport) {
+        throw StateError('Este envio não pertence ao suporte.');
+      }
+      if (action == DispatchAction.deliver &&
+          draft.destination == '10' &&
+          !order.readyForExpedition) {
+        throw StateError(
+          'Conclua a sequência da produção antes de entregar à expedição.',
+        );
+      }
+      if (action == DispatchAction.ship && reference.trim().isEmpty) {
+        throw StateError(
+          'Informe a referência do despacho (pedido, documento ou identificação local).',
+        );
+      }
+      final timings = Map<ProductionStage, ProductionStageTiming>.from(
+        order.timings,
+      );
+      final history = Map<ProductionStage, List<ProductionStageTiming>>.from(
+        order.timingHistory,
+      );
+      var stage = order.currentStage;
+      var status = order.status;
+      if (action == DispatchAction.receiveReturn) {
+        final route = order.plannedStages.isEmpty
+            ? ProductionStage.productionFlow
+            : order.plannedStages;
+        if (returnStage == null ||
+            !ProductionOrderFlow.internalProductionStages.contains(
+              returnStage,
+            ) ||
+            !route.contains(returnStage)) {
+          throw StateError(
+            'Escolha uma etapa de produção da sequência desta OP.',
+          );
+        }
+        if (ProductionOrderFlow.internalProductionStages.contains(stage)) {
+          if (returnStage != stage) {
+            throw StateError(
+              'A OP está em ${stage.label}. Receba nessa etapa para manter a sequência em andamento.',
+            );
+          }
+        } else {
+          if (order.smd.completedAt != null &&
+              route
+                  .skip(route.indexOf(returnStage))
+                  .contains(ProductionStage.smd)) {
+            throw StateError(
+              'Esta volta passaria por um SMD já concluído. Ajuste a programação do retrabalho antes de receber.',
+            );
+          }
+          if (order.activeSessionsAt(stage).isNotEmpty) {
+            throw StateError(
+              'Encerre as sessões da etapa atual antes de receber a devolução.',
+            );
+          }
+          stage = returnStage;
+          status = ProductionRunStatus.waiting;
+          // A retomada reabre as etapas seguintes, preservando cada visita anterior.
+          for (final s in route.skip(route.indexOf(stage))) {
+            final old = timings.remove(s);
+            if (old != null) {
+              history[s] = List.unmodifiable([...(history[s] ?? []), old]);
+            }
+          }
+        }
+      } else if (returnStage != null) {
+        throw StateError(
+          'A etapa de retorno só se aplica ao recebimento na produção.',
+        );
+      }
+      final updatedDraft = draft.addEvent(
+        DispatchEvent(
+          id: eventId,
+          action: action,
+          quantity: quantity,
+          at: now,
+          operatorName: operator.name,
+          operatorUsername: operator.username,
+          note: note.trim(),
+          stage: returnStage?.name ?? '',
+          reference: reference.trim(),
+        ),
+      );
+      final drafts = List<ProductionDispatchDraft>.unmodifiable([
+        for (final d in order.dispatchDrafts)
+          if (d.id == draftId) updatedDraft else d,
+      ]);
+      final accounted =
+          order.storedQuantity +
+          order.dispatchedQuantity +
+          drafts.fold<num>(0, (sum, d) => sum + d.stored + d.shipped);
+      if (stage == ProductionStage.expedition &&
+          order.nextStage == ProductionStage.completed &&
+          accounted >= order.quantity &&
+          order.activeSessionsAt(stage).isEmpty) {
+        stage = ProductionStage.completed;
+        status = ProductionRunStatus.completed;
+      }
+      return order.copyWith(
+        updatedAt: now,
+        currentStage: stage,
+        status: status,
+        timings: timings,
+        timingHistory: history,
+        dispatchDrafts: drafts,
+      );
+    }, localOnly: true);
+  }
+
+  Future<void> _changeSmd(
+    String number,
+    Operator operator,
+    ProductionOrderFlow Function(ProductionOrderFlow, DateTime) change,
+  ) async {
+    if (!canPointSmd(operator)) {
+      throw StateError('Somente o SMD ou a administração pode apontar.');
+    }
+    if (!_orders.any((o) => o.number == number)) {
+      throw StateError('OP não encontrada no VettiFlow.');
+    }
+    if (!_smdBusy.add(number)) {
+      throw StateError('Aguarde o registro anterior terminar.');
+    }
+    try {
+      await _mutate(number, change, smdOperation: true);
+    } finally {
+      _smdBusy.remove(number);
+    }
+  }
+
+  void _requireSmd(ProductionOrderFlow order) {
+    if (order.currentStage != ProductionStage.smd ||
+        order.smd.completedAt != null ||
+        (order.plannedStages.isNotEmpty &&
+            !order.plannedStages.contains(ProductionStage.smd))) {
+      throw StateError('Esta OP não está disponível para apontamento no SMD.');
+    }
+  }
+
+  Future<void> pointSmd(
+    String number, {
+    required Operator operator,
+    required String entryId,
+    required num quantity,
+    String note = '',
+  }) => _changeSmd(number, operator, (order, now) {
+    if (entryId.trim().isEmpty) {
+      throw StateError('Identificação do apontamento inválida.');
+    }
+    final previous = order.smd.entries
+        .where((e) => e.id == entryId)
+        .firstOrNull;
+    if (previous != null) {
+      if (!previous.isReversal &&
+          previous.quantity == quantity &&
+          previous.operatorName == operator.name &&
+          previous.note == note.trim()) {
+        return order;
+      }
+      throw StateError('Este apontamento já foi registrado com outros dados.');
+    }
+    _requireSmd(order);
+    final remaining = order.smd.remaining(order.quantity);
+    if (!quantity.isFinite ||
+        quantity <= 0 ||
+        remaining <= 0 ||
+        quantity > remaining + remaining.abs() * 1e-10) {
+      throw StateError(
+        'A quantidade deve ser maior que zero e não pode ultrapassar o restante.',
+      );
+    }
+    return order.copyWith(
+      updatedAt: now,
+      smd: SmdProgress(
+        entries: List.unmodifiable([
+          ...order.smd.entries,
+          SmdPointing(
+            id: entryId,
+            quantity: quantity.clamp(0, remaining),
+            at: now,
+            operatorName: operator.name,
+            note: note.trim(),
+          ),
+        ]),
+      ),
+    );
+  });
+
+  Future<void> reverseSmdPointing(
+    String number, {
+    required Operator operator,
+    required String pointingId,
+    required String reason,
+  }) => _changeSmd(number, operator, (order, now) {
+    _requireSmd(order);
+    if (reason.trim().isEmpty) {
+      throw StateError('Informe o motivo da correção.');
+    }
+    final entry = order.smd.entries
+        .where((e) => e.id == pointingId && !e.isReversal)
+        .firstOrNull;
+    if (entry == null) throw StateError('Apontamento não encontrado.');
+    if (order.smd.isReversed(pointingId)) return order;
+    return order.copyWith(
+      updatedAt: now,
+      smd: SmdProgress(
+        entries: List.unmodifiable([
+          ...order.smd.entries,
+          SmdPointing(
+            id: 'reverse:$pointingId',
+            reversalOf: pointingId,
+            quantity: entry.quantity,
+            at: now,
+            operatorName: operator.name,
+            note: reason.trim(),
+          ),
+        ]),
+      ),
+    );
+  });
+
+  Future<void> completeSmd(
+    String number, {
+    required Operator operator,
+  }) => _changeSmd(number, operator, (order, now) {
+    _requireSmd(order);
+    if (order.quantity <= 0 || order.smd.remaining(order.quantity) > 1e-8) {
+      throw StateError('Aponte a quantidade restante antes de concluir o SMD.');
+    }
+    final timings = Map<ProductionStage, ProductionStageTiming>.from(
+      order.timings,
+    );
+    final timing = timings[ProductionStage.smd];
+    // Finaliza somente tempos já medidos; um apontamento não cria horas trabalhadas.
+    if (timing?.startedAt != null) {
+      timings[ProductionStage.smd] = timing!.complete(now);
+    }
+    return order.copyWith(
+      currentStage: order.nextStage,
+      status: order.nextStage == ProductionStage.completed
+          ? ProductionRunStatus.completed
+          : ProductionRunStatus.waiting,
+      updatedAt: now,
+      responsavel: () => null,
+      timings: timings,
+      operatorSessions: order.operatorSessions
+          .map(
+            (s) => s.stage == ProductionStage.smd && !s.isCompleted
+                ? s.complete(now)
+                : s,
+          )
+          .toList(),
+      smd: SmdProgress(
+        entries: order.smd.entries,
+        completedAt: now,
+        completedBy: operator.name,
+      ),
+    );
+  });
+
+  Future<void> completeStage(
     String number, {
     String? observation,
     String? operatorName,
     String? operatorPin,
+    List<DefectRecord> defects = const [],
+    ProductionStage? expectedStage,
   }) {
-    _mutate(number, (order, now) {
+    return _mutate(number, (order, now) {
+      if (expectedStage != null && order.currentStage != expectedStage) {
+        throw StateError(
+          'A etapa desta OP mudou. Atualize a fila antes de concluir.',
+        );
+      }
+      if (order.currentStage == ProductionStage.smd) {
+        throw StateError('Conclua esta etapa em SMD → Apontar no VettiFlow.');
+      }
       final timings = Map<ProductionStage, ProductionStageTiming>.from(
         order.timings,
       );
@@ -402,8 +948,16 @@ class ProductionFlowStore extends ChangeNotifier {
           timings[order.currentStage] ??
           const ProductionStageTiming(startedAt: null);
       final sessions = [...order.operatorSessions];
+      final pauseEvents = [...order.pauseEvents];
       final signature = _signatureKey(operatorName, operatorPin);
       if (signature != null) {
+        _closeLatestPauseEvent(
+          pauseEvents,
+          order.currentStage,
+          operatorName,
+          operatorPin,
+          now,
+        );
         final index = _sessionIndex(
           sessions,
           order.currentStage,
@@ -436,51 +990,53 @@ class ProductionFlowStore extends ChangeNotifier {
               return note == null || note.isEmpty ? null : note;
             },
             operatorSessions: sessions,
+            testDefects: [...order.testDefects, ...defects],
+            pauseEvents: pauseEvents,
           );
         }
       }
-      timings[order.currentStage] = current
-          .start(current.startedAt ?? now)
-          .complete(now);
+      timings[order.currentStage] =
+          (current.startedAt == null ? current.start(now) : current).complete(
+            now,
+          );
       return order.copyWith(
-        currentStage: _nextStage(order.currentStage),
-        status: ProductionRunStatus.waiting,
+        currentStage: order.nextStage,
+        status: order.nextStage == ProductionStage.completed
+            ? ProductionRunStatus.completed
+            : ProductionRunStatus.waiting,
         updatedAt: now,
+        responsavel: () => null,
         lastObservation: () {
           final note = observation?.trim();
           return note == null || note.isEmpty ? null : note;
         },
         timings: timings,
         operatorSessions: sessions,
+        testDefects: defects.isEmpty
+            ? order.testDefects
+            : [...order.testDefects, ...defects],
+        pauseEvents: pauseEvents,
       );
     });
   }
 
   /// Conclui o teste registrando os defeitos encontrados (tipo + quantidade)
   /// e avança a OP para a etapa seguinte.
-  void completeTesting(String number, {required List<DefectRecord> defects}) {
-    _mutate(number, (order, now) {
-      final timings = Map<ProductionStage, ProductionStageTiming>.from(
-        order.timings,
-      );
-      final current =
-          timings[order.currentStage] ??
-          const ProductionStageTiming(startedAt: null);
-      timings[order.currentStage] = current
-          .start(current.startedAt ?? now)
-          .complete(now);
-      return order.copyWith(
-        currentStage: _nextStage(order.currentStage),
-        status: ProductionRunStatus.waiting,
-        updatedAt: now,
-        testDefects: defects,
-        timings: timings,
-      );
-    });
-  }
+  Future<void> completeTesting(
+    String number, {
+    required List<DefectRecord> defects,
+    String? operatorName,
+    String? operatorPin,
+  }) => completeStage(
+    number,
+    defects: defects,
+    operatorName: operatorName,
+    operatorPin: operatorPin,
+    expectedStage: ProductionStage.testing,
+  );
 
-  void completeClosing(String number, {required int closedQuantity}) {
-    _mutate(number, (order, now) {
+  Future<void> completeClosing(String number, {required int closedQuantity}) {
+    return _mutate(number, (order, now) {
       final timings = Map<ProductionStage, ProductionStageTiming>.from(
         order.timings,
       );
@@ -492,8 +1048,10 @@ class ProductionFlowStore extends ChangeNotifier {
           .complete(now);
       final safeClosed = closedQuantity.clamp(0, order.quantity).toInt();
       return order.copyWith(
-        currentStage: _nextStage(order.currentStage),
-        status: ProductionRunStatus.waiting,
+        currentStage: order.nextStage,
+        status: order.nextStage == ProductionStage.completed
+            ? ProductionRunStatus.completed
+            : ProductionRunStatus.waiting,
         updatedAt: now,
         closedQuantity: safeClosed,
         timings: timings,
@@ -501,8 +1059,31 @@ class ProductionFlowStore extends ChangeNotifier {
     });
   }
 
-  void completeExpedition(String number, {required int storedQuantity}) {
-    _mutate(number, (order, now) {
+  Future<void> completeExpedition(
+    String number, {
+    required int storedQuantity,
+  }) {
+    return _mutate(number, (order, now) {
+      if (order.preparedQuantity > 0) {
+        throw StateError(
+          'Esta OP tem preparos por quantidade. Confira os preparos antes de finalizar o lote inteiro.',
+        );
+      }
+      final item = catalogItem(order.productCode);
+      final routing = FinishedGoodsRouting.suggest(
+        productCode: order.productCode,
+        orderWarehouse: order.orderWarehouse,
+        componentWarehouses: item.components.map((component) {
+          return component.armazem;
+        }),
+      );
+      if (!routing.canComplete) {
+        throw StateError(
+          routing.warnings.isEmpty
+              ? 'Destino do acabado incerto.'
+              : routing.warnings.first,
+        );
+      }
       final timings = Map<ProductionStage, ProductionStageTiming>.from(
         order.timings,
       );
@@ -519,6 +1100,9 @@ class ProductionFlowStore extends ChangeNotifier {
             : ProductionStage.completed,
         status: ProductionRunStatus.completed,
         updatedAt: now,
+        componentConsumptionWarehouse: routing.componentConsumptionWarehouse,
+        finishedGoodsWarehouse: routing.finishedGoodsWarehouse,
+        routingWarnings: routing.warnings,
         storedQuantity: safeStored,
         dispatchedQuantity: order.quantity - safeStored,
         timings: timings,
@@ -526,8 +1110,8 @@ class ProductionFlowStore extends ChangeNotifier {
     });
   }
 
-  void dispatchStored(String number, {required int quantity}) {
-    _mutate(number, (order, now) {
+  Future<void> dispatchStored(String number, {required int quantity}) {
+    return _mutate(number, (order, now) {
       if (order.currentStage != ProductionStage.storage) return order;
       final safeQuantity = quantity.clamp(0, order.storedQuantity).toInt();
       if (safeQuantity <= 0) return order;
@@ -544,22 +1128,111 @@ class ProductionFlowStore extends ChangeNotifier {
     });
   }
 
-  void _mutate(
+  Future<void> _mutate(
     String number,
     ProductionOrderFlow Function(ProductionOrderFlow order, DateTime now)
-    update,
-  ) {
+    update, {
+    bool smdOperation = false,
+    bool localOnly = false,
+  }) async {
+    if (_smdBusy.contains(number) && !smdOperation) {
+      throw StateError('Aguarde o registro do SMD terminar.');
+    }
     final index = _orders.indexWhere((order) => order.number == number);
     if (index == -1) return;
-    _orders[index] = update(_orders[index], DateTime.now());
-    _persist();
-    notifyListeners();
+    if (!_mutationBusy.add(number)) {
+      throw StateError('Aguarde o registro anterior desta OP terminar.');
+    }
+    try {
+      final previous = _orders[index];
+      final updated = update(previous, DateTime.now());
+      if (identical(previous, updated)) return;
+      if (!localOnly) await _syncOrder(updated, 'updated');
+      // Outra OP pode ter sido removida enquanto a persistência estava em curso.
+      final currentIndex = _orders.indexWhere((o) => o.number == number);
+      if (currentIndex == -1) {
+        throw StateError('A OP não está mais disponível.');
+      }
+      _orders[currentIndex] = updated;
+      try {
+        _persist();
+      } catch (_) {
+        _orders[currentIndex] = previous;
+        rethrow;
+      }
+      notifyListeners();
+    } finally {
+      _mutationBusy.remove(number);
+    }
+  }
+
+  Future<void> _loadFromDatabase() async {
+    try {
+      final snapshot = await database.loadSnapshot();
+      if (snapshot.orders.isEmpty) return;
+      _orders
+        ..clear()
+        ..addAll(snapshot.orders);
+      _catalogOverrides
+        ..clear()
+        ..addEntries(
+          snapshot.catalogItems.map((item) => MapEntry(item.code, item)),
+        );
+      _nextSequence = _nextSequenceFrom(snapshot.orders);
+      _persist();
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('Erro ao carregar OPs do banco: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      // O app continua pelo cache local quando a persistencia estiver indisponivel.
+    }
+  }
+
+  Future<void> _syncOrder(ProductionOrderFlow order, String eventType) async {
+    final product = catalogItem(order.productCode);
+    try {
+      await database.saveOrder(order, product, eventType: eventType);
+    } catch (error, stackTrace) {
+      debugPrint('Erro ao sincronizar OP ${order.number} no banco: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Reserva o numero da proxima OP.
+  ///
+  /// O banco e a fonte da verdade: a reserva e atomica, entao duas maquinas no
+  /// mesmo ambiente nunca recebem o mesmo numero. O contador local so entra
+  /// quando o banco esta fora do ar — e ai a OP fica no cache ate voltar.
+  Future<int> _reserveSequence() async {
+    try {
+      final reserved = await database.nextOrderSequence();
+      if (reserved != null) {
+        if (reserved >= _nextSequence) _nextSequence = reserved + 1;
+        return reserved;
+      }
+    } catch (error) {
+      debugPrint('Erro ao reservar numero de OP no banco: $error');
+    }
+    return _nextSequence++;
+  }
+
+  int _nextSequenceFrom(List<ProductionOrderFlow> orders) {
+    var next = _nextSequence;
+    for (final order in orders) {
+      final sequence = int.tryParse(order.number.split('-').last);
+      if (sequence != null && sequence >= next) next = sequence + 1;
+    }
+    return next;
   }
 
   void _persist() {
     _persistence.write(
       jsonEncode({
         'nextSequence': _nextSequence,
+        'catalogOverrides': _catalogOverrides.values
+            .map(_catalogItemToJson)
+            .toList(),
         'orders': _orders.map(_orderToJson).toList(),
       }),
     );
@@ -570,6 +1243,14 @@ class ProductionFlowStore extends ChangeNotifier {
     try {
       final decoded = jsonDecode(payload) as Map<String, dynamic>;
       final orders = decoded['orders'] as List<dynamic>;
+      final catalogOverrides = decoded['catalogOverrides'] as List<dynamic>?;
+      _catalogOverrides
+        ..clear()
+        ..addEntries(
+          (catalogOverrides ?? const [])
+              .map((item) => _catalogItemFromJson(item as Map<String, dynamic>))
+              .map((item) => MapEntry(item.code, item)),
+        );
       _orders
         ..clear()
         ..addAll(
@@ -583,20 +1264,97 @@ class ProductionFlowStore extends ChangeNotifier {
     }
   }
 
+  Map<String, dynamic> _catalogItemToJson(ProductionCatalogItem item) {
+    return {
+      'code': item.code,
+      'name': item.name,
+      'defaultQuantity': item.defaultQuantity,
+      'unit': item.unit,
+      'components': item.components.map(_componentToJson).toList(),
+    };
+  }
+
+  ProductionCatalogItem _catalogItemFromJson(Map<String, dynamic> json) {
+    return ProductionCatalogItem(
+      code: json['code'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      defaultQuantity: (json['defaultQuantity'] as num?)?.toInt() ?? 1,
+      unit: json['unit'] as String? ?? 'PC',
+      components:
+          (json['components'] as List<dynamic>?)
+              ?.map(
+                (component) =>
+                    _componentFromJson(component as Map<String, dynamic>),
+              )
+              .toList() ??
+          const [],
+    );
+  }
+
+  Map<String, dynamic> _componentToJson(ProductionComponent component) {
+    return {
+      'code': component.code,
+      'unit': component.unit,
+      'description': component.description,
+      'quantity': component.quantity,
+      'stock': component.stock,
+      'filial': component.filial,
+      'armazem': component.armazem,
+      'currentStock': component.currentStock,
+      'committedQuantity': component.committedQuantity,
+      'reservedQuantity': component.reservedQuantity,
+      'requirementSource': component.requirementSource,
+      'sourceOrder': component.sourceOrder,
+      'commitmentDate': component.commitmentDate,
+      'originalQuantity': component.originalQuantity,
+      'commitmentQuantity': component.commitmentQuantity,
+      'structureSequence': component.structureSequence,
+    };
+  }
+
+  ProductionComponent _componentFromJson(Map<String, dynamic> json) {
+    return ProductionComponent(
+      code: json['code'] as String? ?? '',
+      unit: json['unit'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      quantity: (json['quantity'] as num?) ?? 0,
+      stock: (json['stock'] as num?) ?? 0,
+      filial: json['filial'] as String? ?? '',
+      armazem: json['armazem'] as String? ?? '',
+      currentStock: (json['currentStock'] as num?) ?? 0,
+      committedQuantity: (json['committedQuantity'] as num?) ?? 0,
+      reservedQuantity: (json['reservedQuantity'] as num?) ?? 0,
+      requirementSource: json['requirementSource'] as String? ?? 'SG1',
+      sourceOrder: json['sourceOrder'] as String? ?? '',
+      commitmentDate: json['commitmentDate'] as String? ?? '',
+      originalQuantity: (json['originalQuantity'] as num?) ?? 0,
+      commitmentQuantity: (json['commitmentQuantity'] as num?) ?? 0,
+      structureSequence: json['structureSequence'] as String? ?? '',
+    );
+  }
+
   Map<String, dynamic> _orderToJson(ProductionOrderFlow order) {
     return {
       'number': order.number,
       'productCode': order.productCode,
       'productName': order.productName,
       'quantity': order.quantity,
+      'unit': order.unit,
+      'smd': order.smd.toJson(),
+      'dispatchDrafts': order.dispatchDrafts.map((d) => d.toJson()).toList(),
       'currentStage': order.currentStage.name,
       'status': order.status.name,
       'priority': order.priority,
       'createdAt': order.createdAt.toIso8601String(),
       'updatedAt': order.updatedAt.toIso8601String(),
       'operatorName': order.operatorName,
+      'operatorPin': order.operatorPin,
       'responsavel': order.responsavel,
       'prazo': order.prazo,
+      'orderWarehouse': order.orderWarehouse,
+      'componentConsumptionWarehouse': order.componentConsumptionWarehouse,
+      'finishedGoodsWarehouse': order.finishedGoodsWarehouse,
+      'routingWarnings': order.routingWarnings,
       'closedQuantity': order.closedQuantity,
       'lastObservation': order.lastObservation,
       'storedQuantity': order.storedQuantity,
@@ -605,11 +1363,19 @@ class ProductionFlowStore extends ChangeNotifier {
         for (final entry in order.timings.entries)
           entry.key.name: _timingToJson(entry.value),
       },
+      'timingHistory': {
+        for (final e in order.timingHistory.entries)
+          e.key.name: e.value.map(_timingToJson).toList(),
+      },
+      'warehouseReleases': order.warehouseReleases
+          .map((e) => e.toJson())
+          .toList(),
       'testDefects': order.testDefects.map((d) => d.toJson()).toList(),
       'operatorSessions': order.operatorSessions
           .map((s) => s.toJson())
           .toList(),
       'pauseEvents': order.pauseEvents.map((p) => p.toJson()).toList(),
+      'plannedStages': order.plannedStages.map((stage) => stage.name).toList(),
     };
   }
 
@@ -619,19 +1385,52 @@ class ProductionFlowStore extends ChangeNotifier {
       productCode: json['productCode'] as String? ?? '',
       productName: json['productName'] as String? ?? '',
       quantity: (json['quantity'] as num).toInt(),
+      unit: json['unit'] as String? ?? '',
+      dispatchDrafts: List.unmodifiable(
+        (json['dispatchDrafts'] as List? ?? []).map(
+          (d) => ProductionDispatchDraft.fromJson(
+            Map<String, dynamic>.from(d as Map),
+          ),
+        ),
+      ),
+      smd: SmdProgress.fromJson(
+        Map<String, dynamic>.from(json['smd'] as Map? ?? {}),
+      ),
       currentStage: _stageFromName(json['currentStage'] as String?),
       status: _statusFromName(json['status'] as String?),
       priority: json['priority'] as String? ?? 'Media',
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       operatorName: json['operatorName'] as String?,
+      operatorPin: json['operatorPin'] as String?,
       responsavel: json['responsavel'] as String?,
       prazo: json['prazo'] as String?,
+      orderWarehouse: json['orderWarehouse'] as String? ?? '',
+      componentConsumptionWarehouse:
+          json['componentConsumptionWarehouse'] as String? ?? '',
+      finishedGoodsWarehouse: json['finishedGoodsWarehouse'] as String? ?? '',
+      routingWarnings:
+          (json['routingWarnings'] as List<dynamic>?)
+              ?.map((item) => item as String)
+              .toList() ??
+          const [],
       closedQuantity: (json['closedQuantity'] as num?)?.toInt() ?? 0,
       lastObservation: json['lastObservation'] as String?,
       storedQuantity: (json['storedQuantity'] as num?)?.toInt() ?? 0,
       dispatchedQuantity: (json['dispatchedQuantity'] as num?)?.toInt() ?? 0,
       timings: _timingsFromJson(json['timings'] as Map<String, dynamic>?),
+      warehouseReleases: List.unmodifiable(
+        (json['warehouseReleases'] as List? ?? []).map(
+          (e) => WarehouseRelease.fromJson(Map<String, dynamic>.from(e as Map)),
+        ),
+      ),
+      timingHistory: {
+        for (final e
+            in (json['timingHistory'] as Map<String, dynamic>? ?? {}).entries)
+          _stageFromName(e.key): (e.value as List)
+              .map((v) => _timingFromJson(Map<String, dynamic>.from(v as Map)))
+              .toList(),
+      },
       testDefects:
           (json['testDefects'] as List<dynamic>?)
               ?.map((d) => DefectRecord.fromJson(d as Map<String, dynamic>))
@@ -651,6 +1450,12 @@ class ProductionFlowStore extends ChangeNotifier {
               ?.map(
                 (p) => ProductionPauseEvent.fromJson(p as Map<String, dynamic>),
               )
+              .toList() ??
+          const [],
+      plannedStages:
+          (json['plannedStages'] as List<dynamic>?)
+              ?.map((stage) => _stageFromName(stage as String?))
+              .where(_isRoutableStage)
               .toList() ??
           const [],
     );
@@ -704,18 +1509,36 @@ class ProductionFlowStore extends ChangeNotifier {
     );
   }
 
-  ProductionStage _nextStage(ProductionStage stage) {
-    return switch (stage) {
-      ProductionStage.warehouse => ProductionStage.firmware,
-      ProductionStage.firmware => ProductionStage.soldering,
-      ProductionStage.soldering => ProductionStage.testing,
-      ProductionStage.testing => ProductionStage.closing,
-      ProductionStage.closing => ProductionStage.expedition,
-      ProductionStage.expedition => ProductionStage.completed,
-      ProductionStage.storage => ProductionStage.completed,
-      ProductionStage.completed => ProductionStage.completed,
-    };
+  List<ProductionStage> _sanitizePlannedStages(
+    ProductionStage currentStage,
+    List<ProductionStage> stages,
+  ) {
+    final route = <ProductionStage>[];
+    for (final stage in stages) {
+      if (!_isRoutableStage(stage)) continue;
+      if (!route.contains(stage)) route.add(stage);
+    }
+    if (_isRoutableStage(currentStage) && !route.contains(currentStage)) {
+      route.insert(0, currentStage);
+    }
+    return route;
   }
+
+  bool _isRoutableStage(ProductionStage stage) =>
+      ProductionStage.productionFlow.contains(stage);
+
+  bool _requiresProtheusSignature(List<ProductionComponent> components) {
+    return components.any(_movesProtheusStock);
+  }
+
+  bool _movesProtheusStock(ProductionComponent component) {
+    return component.code.trim().isNotEmpty &&
+        component.armazem.trim().isNotEmpty &&
+        component.quantity > 0 &&
+        !component.code.toUpperCase().startsWith('MOD');
+  }
+
+  bool _hasPin(String? operatorPin) => operatorPin?.trim().isNotEmpty ?? false;
 
   ProductionStage _previousStage(ProductionStage stage) {
     final flow = ProductionStage.productionFlow;
@@ -796,90 +1619,5 @@ class ProductionFlowStore extends ChangeNotifier {
         return;
       }
     }
-  }
-
-  List<ProductionOrderFlow> _seedOrders() {
-    final now = DateTime.now();
-    return [
-      ProductionOrderFlow(
-        number: 'OP-00564-345',
-        productCode: 'CR4',
-        productName: 'Modulo de 4 zonas com fio',
-        quantity: 3000,
-        currentStage: ProductionStage.firmware,
-        status: ProductionRunStatus.waiting,
-        priority: 'Alta',
-        createdAt: now.subtract(const Duration(hours: 2)),
-        updatedAt: now.subtract(const Duration(minutes: 24)),
-      ),
-      ProductionOrderFlow(
-        number: 'OP-00564-348',
-        productCode: 'SMARTALARM32-V6',
-        productName: 'Central SmartAlarm32 V6.68',
-        quantity: 500,
-        currentStage: ProductionStage.soldering,
-        status: ProductionRunStatus.active,
-        priority: 'Media',
-        createdAt: now.subtract(const Duration(hours: 4)),
-        updatedAt: now.subtract(const Duration(minutes: 8)),
-        timings: {
-          ProductionStage.soldering: ProductionStageTiming(
-            startedAt: now.subtract(const Duration(minutes: 18)),
-          ),
-        },
-      ),
-      ProductionOrderFlow(
-        number: 'OP-00564-350',
-        productCode: 'INFRA-LONGO',
-        productName: 'Sensor infravermelho alcance longo',
-        quantity: 650,
-        currentStage: ProductionStage.testing,
-        status: ProductionRunStatus.paused,
-        priority: 'Baixa',
-        createdAt: now.subtract(const Duration(hours: 5)),
-        updatedAt: now.subtract(const Duration(minutes: 4)),
-        timings: {
-          ProductionStage.testing: ProductionStageTiming(
-            startedAt: now.subtract(const Duration(minutes: 35)),
-            pausedAt: now.subtract(const Duration(minutes: 4)),
-          ),
-        },
-      ),
-      ProductionOrderFlow(
-        number: 'OP-00564-351',
-        productCode: 'SMART-TECLADO',
-        productName: 'Teclado inteligente',
-        quantity: 450,
-        currentStage: ProductionStage.closing,
-        status: ProductionRunStatus.waiting,
-        priority: 'Media',
-        createdAt: now.subtract(const Duration(hours: 5)),
-        updatedAt: now.subtract(const Duration(minutes: 6)),
-      ),
-      ProductionOrderFlow(
-        number: 'OP-00564-352',
-        productCode: 'SIRENE-SF',
-        productName: 'Sirene sem fio',
-        quantity: 300,
-        currentStage: ProductionStage.expedition,
-        status: ProductionRunStatus.waiting,
-        priority: 'Media',
-        createdAt: now.subtract(const Duration(hours: 6)),
-        updatedAt: now.subtract(const Duration(minutes: 2)),
-      ),
-      ProductionOrderFlow(
-        number: 'OP-00563-992',
-        productCode: 'MAG-CURTO',
-        productName: 'Sensor magnetico alcance curto',
-        quantity: 900,
-        currentStage: ProductionStage.storage,
-        status: ProductionRunStatus.completed,
-        priority: 'Baixa',
-        createdAt: now.subtract(const Duration(hours: 8)),
-        updatedAt: now.subtract(const Duration(minutes: 30)),
-        storedQuantity: 180,
-        dispatchedQuantity: 720,
-      ),
-    ];
   }
 }

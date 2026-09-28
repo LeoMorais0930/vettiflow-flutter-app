@@ -19,11 +19,24 @@ Color stageAccent(ProductionStage stage) {
   };
 }
 
-class KanbanView extends StatelessWidget {
+class KanbanView extends StatefulWidget {
   final List<OrdemProducao> ordens;
   final ValueChanged<String> onOpenOP;
 
   const KanbanView({super.key, required this.ordens, required this.onOpenOP});
+
+  @override
+  State<KanbanView> createState() => _KanbanViewState();
+}
+
+class _KanbanViewState extends State<KanbanView> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,25 +55,37 @@ class KanbanView extends StatelessWidget {
         );
         final columnWidth = (contentWidth - totalGap) / flow.length;
 
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: contentWidth,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < flow.length; i++) ...[
-                  SizedBox(
-                    width: columnWidth,
-                    child: _KanbanColumn(
-                      stage: flow[i],
-                      items: ordens.where((op) => op.stage == flow[i]).toList(),
-                      onOpenOP: onOpenOP,
-                    ),
-                  ),
-                  if (i < flow.length - 1) const SizedBox(width: gap),
-                ],
-              ],
+        return ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+          child: Scrollbar(
+            controller: _scroll,
+            thumbVisibility: contentWidth > available,
+            trackVisibility: contentWidth > available,
+            child: SingleChildScrollView(
+              controller: _scroll,
+              padding: const EdgeInsets.only(bottom: 14),
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: contentWidth,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < flow.length; i++) ...[
+                      SizedBox(
+                        width: columnWidth,
+                        child: _KanbanColumn(
+                          stage: flow[i],
+                          items: widget.ordens
+                              .where((op) => op.stage == flow[i])
+                              .toList(),
+                          onOpenOP: widget.onOpenOP,
+                        ),
+                      ),
+                      if (i < flow.length - 1) const SizedBox(width: gap),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         );

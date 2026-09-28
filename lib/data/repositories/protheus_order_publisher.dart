@@ -4,12 +4,12 @@ import 'package:vetti_flow_1_0/data/models/production_flow.dart';
 import 'package:vetti_flow_1_0/data/repositories/mutation_sync_service.dart';
 import 'package:vetti_flow_1_0/data/repositories/pending_mutation_store.dart';
 
-/// O que aconteceu com a OP no caminho ate o Protheus.
+/// O que aconteceu com o rascunho local da OP para o Protheus.
 ///
 /// Existe porque abrir OP no VettiFlow gravava so em
 /// `vettiflow.production_orders` e ninguem ficava sabendo que a SC2/SD4 nao
-/// tinham sido tocadas. Agora o resultado dessa tentativa e um valor explicito,
-/// que a tela e obrigada a olhar.
+/// tinham sido tocadas. Agora o resultado e explicito e, no modo atual, fica
+/// bloqueado em somente leitura.
 @immutable
 class ProtheusPublishOutcome {
   const ProtheusPublishOutcome._({
@@ -20,7 +20,7 @@ class ProtheusPublishOutcome {
     this.protheusRef,
   });
 
-  /// Chegou ate o fim: armazenada e finalizada, com SC2/SD4/SB2 gravadas.
+  /// Mantido para compatibilidade com testes antigos de simulacao controlada.
   const ProtheusPublishOutcome.gravada({
     required String mutationId,
     String? protheusRef,
@@ -30,18 +30,13 @@ class ProtheusPublishOutcome {
          protheusRef: protheusRef,
        );
 
-  /// Nao chegou. A mutacao fica na fila para reenvio.
+  /// Nao chegou. A mutacao fica como rascunho local visivel.
   const ProtheusPublishOutcome.naFila({
     required String mutationId,
     required String motivo,
-  }) : this._(
-         gravouNoProtheus: false,
-         mutationId: mutationId,
-         motivo: motivo,
-       );
+  }) : this._(gravouNoProtheus: false, mutationId: mutationId, motivo: motivo);
 
-  /// A API respondeu "enviado", mas esta em modo de validacao (`VF_APPLY=0`) e
-  /// nao encostou na SC2/SD4/SB2.
+  /// A API respondeu "enviado", mas indicou simulacao no retorno.
   ///
   /// Sem isto o app anunciaria sucesso em cima de um `DRY:` — exatamente o
   /// silencio que este codigo existe para acabar.
@@ -50,7 +45,7 @@ class ProtheusPublishOutcome {
         gravouNoProtheus: false,
         simulacao: true,
         mutationId: mutationId,
-        motivo: 'a API esta em modo de validacao (VF_APPLY=0)',
+        motivo: 'a API esta em modo de simulacao',
       );
 
   final bool gravouNoProtheus;
@@ -64,12 +59,12 @@ class ProtheusPublishOutcome {
   /// Frase pronta para a tela, ja no tom de aviso.
   String get aviso => simulacao
       ? 'nao foi gravada no Protheus: ${motivo!}. A SC2/SD4 nao foram '
-            'tocadas — mude para VF_APPLY=1 quando quiser valer.'
+            'tocadas.'
       : 'nao foi enviada ao Protheus: ${motivo ?? 'motivo desconhecido'}. '
-            'Ficou na fila do Protheus para reenvio.';
+            'Ficou como rascunho local somente leitura.';
 }
 
-/// Leva a abertura de OP ate as tabelas do Protheus.
+/// Converte abertura de OP em rascunho local relacionado ao Protheus.
 abstract class ProtheusOrderPublisher {
   Future<ProtheusPublishOutcome> publishOrder({
     required ProductionOrderFlow order,
@@ -78,11 +73,9 @@ abstract class ProtheusOrderPublisher {
   });
 }
 
-/// Implementacao real: enfileira a `AberturaOpMutation` e ja manda para a API,
-/// nas duas fases (armazenar e finalizar).
-///
-/// A fila continua sendo a fonte da verdade: se a API estiver fora, a mutacao
-/// fica gravada como pendente e a tela Fila do Protheus reenvia depois.
+/// Implementacao local: enfileira a `AberturaOpMutation` e passa pelo client.
+/// O client atual bloqueia escrita antes de qualquer POST, mantendo leitura
+/// Protheus como unica integracao ativa.
 class MutationProtheusOrderPublisher implements ProtheusOrderPublisher {
   const MutationProtheusOrderPublisher({
     required this.mutations,
@@ -129,7 +122,6 @@ class MutationProtheusOrderPublisher implements ProtheusOrderPublisher {
 
     if (resultado == MutationStatus.enviado) {
       final ref = atualizada?.protheusRef ?? '';
-      // A API marca a simulacao no proprio ref. Ver `VF_APPLY` em api/README.md.
       if (ref.startsWith('DRY:')) {
         return ProtheusPublishOutcome.simulada(mutationId: mutation.id);
       }
@@ -148,12 +140,11 @@ class MutationProtheusOrderPublisher implements ProtheusOrderPublisher {
     );
   }
 
-  String _motivoPadrao(MutationStatus status, String? ref) =>
-      switch (status) {
-        MutationStatus.armazenado =>
-          'a API aceitou (${ref ?? 'sem ref'}) mas nao conseguiu aplicar em '
-              'SC2/SD4',
-        MutationStatus.erro => 'a API recusou a abertura',
-        _ => 'a API do Protheus nao respondeu',
-      };
+  String _motivoPadrao(MutationStatus status, String? ref) => switch (status) {
+    MutationStatus.armazenado =>
+      'a API aceitou (${ref ?? 'sem ref'}) mas nao conseguiu aplicar em '
+          'SC2/SD4',
+    MutationStatus.erro => 'a API recusou a abertura',
+    _ => 'a API do Protheus nao respondeu',
+  };
 }

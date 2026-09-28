@@ -1,230 +1,152 @@
-# VettiFlow · API do Protheus
+# VettiFlow API Protheus Dev
 
-Transporte entre a fila de mutações do VettiFlow e as tabelas do Protheus.
+API interna read-only para o VettiFlow consultar a base dev do Protheus no SQL
+Server.
 
-O VettiFlow opera com o ERP fora do alcance: o chão de fábrica pede abertura de
-OP, mexe nos empenhos e transfere material entre armazéns, e tudo isso fica em
-cache local no app. Esta API é o que leva esse cache para o outro lado.
+## Base Atual
 
-## Onde ela grava — leia antes de subir
+- Servidor: `win-l1na6ce7lb4`
+- Porta: `1433`
+- Database SQL Server: `HMLp12`
+- Schema: `dbo`
+- Empresa: `010`
+- Filial padrao: `04`
 
-Hoje aplica no banco **`vettip12`**, a cópia do Protheus migrada para o
-PostgreSQL. **Não é o Protheus de produção.** É de propósito: o objetivo é ver
-o efeito real das mutações nas tabelas — quais linhas nascem, quais saldos se
-mexem — antes de encostar no ERP de verdade.
+As rotas de escrita continuam bloqueadas com `503`. Por enquanto esta API le
+produtos, estrutura, saldos, OPs abertas, empenhos, movimentos oficiais de OP,
+transferencias oficiais entre locais, desmontagens oficiais e auditoria de
+movimentos especiais de estoque, alem de previa read-only de apontamento.
+Tambem expoe governanca de escrita futura por `GET /api/v1/write-readiness`,
+sempre com `writeEnabled=false`.
 
-A leitura de produtos/saldos aceita dois formatos:
+O almoxarifado também consulta histórico, estoque, OPs e inventários. Datas omitidas abrangem todo o período, com até 100 registros por página.
 
-- export/importado do app: `protheus_raw.vw_sb1_products`,
-  `protheus_raw.vw_sg1_product_structures`, `protheus_raw.vw_sb2_stock_balances`
-  e `protheus_raw.vw_sc2_orders`;
-- tabelas físicas espelhadas do Protheus: `sb1010`, `sg1010`, `sb2010`,
-  `sc2010`, etc. O sufixo vem de `VF_EMPRESA`.
+O passo a passo do app está no [README principal](../README.md); os guias estão em [docs](../docs/README.md).
 
-Os testes gravam dentro de transações que são desfeitas no fim. O serviço, não:
-`POST /api/v1/mutations` **altera SC2, SD4 e SB2 de verdade**. Para exercitar o
-caminho inteiro sem escrever:
-
-```bash
-VF_APPLY=0 ./venv/bin/uvicorn app.main:app --reload
-```
-
-Tudo que for aplicado fica registrado em `vf_mutations`, com o estado anterior
-de cada linha tocada na coluna `antes` — é o que permite desfazer.
-
-## Subir
+## Subir Local
 
 ```bash
-python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
-```
-
-```bash
+python -m venv venv
+./venv/Scripts/pip install -r requirements.txt
 cp .env.example .env
-# edite .env com o host, usuário, senha e token desta máquina
-./venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
-O arquivo `api/.env` é local e ignorado pelo Git. Cada máquina pode ter seu
-próprio `VF_DSN`/`VF_API_TOKEN` sem gerar conflito de merge.
-
-Documentação interativa em <http://localhost:8000/docs>.
-
-## Modo servidor / teste pesado
-
-Na VM/servidor, suba a API com token e sem depender dos defaults locais:
+Preencha `api/.env` com a senha local do SQL Server e um token interno. Esse
+arquivo e ignorado pelo Git.
 
 ```bash
-export VF_DSN="postgresql://usuario:senha@localhost:5432/vettip12"
-export VF_API_TOKEN="trocar-por-um-token-interno"
-export VF_CORS_ORIGINS="http://localhost:8080,http://IP-OU-HOST-DO-SERVIDOR:8080"
-export VF_APPLY=0
-export VF_REQUIRE_SF5_MOVEMENTS=1
-export VF_TM_PR0="CODIGO-PR0-DA-SF5"
-export VF_TM_RE1="CODIGO-RE1-DA-SF5"
-export VF_TM_RE4="CODIGO-RE4-DA-SF5"
-export VF_TM_DE4="CODIGO-DE4-DA-SF5"
-./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+./venv/Scripts/uvicorn app.main:app --reload --port 8000
 ```
 
-Use `VF_APPLY=0` na primeira rodada para simular e auditar sem mexer em
-SC2/SD4/SB2. Depois da conferência no banco dev, troque para `VF_APPLY=1`.
-Com `VF_REQUIRE_SF5_MOVEMENTS=1`, qualquer gravação em SD3 é recusada se o
-tipo de movimento (`D3_TM`) não existir na SF5 ou se o `F5_TIPO` não combinar
-com o movimento (`P` produção, `R` requisição, `D` devolução).
+Documentacao interativa:
 
-Da maquina que roda o app, valide a API antes de criar OP:
-
-```powershell
-.\tools\check_protheus_server_api.ps1 `
-  -ApiUrl 'http://IP-OU-HOST-DO-SERVIDOR:8000' `
-  -ApiToken 'trocar-por-um-token-interno' `
-  -SampleProduct '730-0863'
+```text
+http://localhost:8000/docs
 ```
 
-Apontar o app para cá:
+## Configuracao
+
+| Variavel | Padrao | O que faz |
+|---|---|---|
+| `VF_PROTHEUS_HOST` | `win-l1na6ce7lb4` | Host SQL Server |
+| `VF_PROTHEUS_PORT` | `1433` | Porta SQL Server |
+| `VF_PROTHEUS_DATABASE` | `HMLp12` | Base dev |
+| `VF_PROTHEUS_SCHEMA` | `dbo` | Schema das tabelas |
+| `VF_PROTHEUS_USER` | vazio | Login SQL Server |
+| `VF_PROTHEUS_PASSWORD` | vazio | Senha SQL Server local |
+| `VF_MSSQL_DRIVER` | `ODBC Driver 17 for SQL Server` | Driver ODBC instalado |
+| `VF_MSSQL_ENCRYPT` | `No` | Criptografia da conexao |
+| `VF_MSSQL_TRUST_SERVER_CERT` | `Yes` | Aceita certificado interno |
+| `VF_API_TOKEN` | vazio | Token exigido em `X-API-Token`; vazio libera so loopback |
+| `VF_CORS_ORIGINS` | `*` | Origens web aceitas |
+| `VF_EMPRESA` | `010` | Sufixo das tabelas, como `SB1010` |
+| `VF_FILIAL` | `04` | Filial padrao |
+
+## Validar
+
+```bash
+./venv/Scripts/python -m pytest tests/ -q
+```
+
+```bash
+curl -H "X-API-Token: $VF_API_TOKEN" http://localhost:8000/api/v1/health
+curl -H "X-API-Token: $VF_API_TOKEN" "http://localhost:8000/api/v1/produtos?query=710&filial=04&limit=5"
+curl -H "X-API-Token: $VF_API_TOKEN" "http://localhost:8000/api/v1/ops/01621401001/movimentos?filial=04"
+curl -H "X-API-Token: $VF_API_TOKEN" "http://localhost:8000/api/v1/transferencias?filial=04&produto=100-010&limit=10"
+curl -H "X-API-Token: $VF_API_TOKEN" "http://localhost:8000/api/v1/desmontagens?filial=04&documento=DESMONT23"
+curl -H "X-API-Token: $VF_API_TOKEN" "http://localhost:8000/api/v1/auditoria-estoque?filial=04&tipo=estorno_op&limit=10"
+curl -H "X-API-Token: $VF_API_TOKEN" "http://localhost:8000/api/v1/ops/01621401001/apontamento-preview?filial=04&quantidade=50"
+curl -H "X-API-Token: $VF_API_TOKEN" "http://localhost:8000/api/v1/write-readiness"
+```
+
+## App Flutter
 
 ```bash
 flutter run \
   --dart-define=VETTIFLOW_API_URL=http://localhost:8000 \
-  --dart-define=VETTIFLOW_API_TOKEN=trocar-por-um-token-interno \
-  --dart-define=VETTIFLOW_ALLOW_DIRECT_POSTGRES_FALLBACK=false
-```
-
-Com `VETTIFLOW_ALLOW_DIRECT_POSTGRES_FALLBACK=false`, a busca de produto/saldo
-fica centralizada na FastAPI. Em desenvolvimento local, deixar o fallback ligado
-permite abrir o app mesmo sem a API rodando.
-
-## Testes
-
-```bash
-./venv/bin/python -m pytest tests/ -q
-```
-
-Rodam contra o banco configurado em `VF_DSN` e desfazem o que fizeram.
-
-## Configuração
-
-| Variável     | Padrão                                   | O que faz                                    |
-|--------------|------------------------------------------|----------------------------------------------|
-| `VF_DSN`     | `postgresql://localhost:5432/vettip12`   | Banco onde aplica                            |
-| `VF_API_TOKEN` | vazio                                  | Token exigido nos endpoints de dados/mutação |
-| `VF_CORS_ORIGINS` | `*`                                 | Origens web liberadas, separadas por vírgula |
-| `VF_EMPRESA` | `010`                                    | Sufixo das tabelas (`SC2` → `sc2010`)        |
-| `VF_APPLY`   | `1`                                      | `0` valida e audita, mas não grava           |
-| `VF_FILIAL`  | `04`                                     | Filial padrão das consultas                  |
-| `VF_REQUIRE_SF5_MOVEMENTS` | `0`                         | `1` exige validar `D3_TM` na `SF5` antes de gravar `SD3` |
-| `VF_TM_PR0`  | vazio                                    | `F5_CODIGO` usado no `D3_TM` para produção manual (`D3_CF=PR0`) |
-| `VF_TM_RE1`  | vazio                                    | `F5_CODIGO` usado no `D3_TM` para requisição automática (`D3_CF=RE1`) |
-| `VF_TM_RE4`  | vazio                                    | `F5_CODIGO` usado no `D3_TM` para saída por transferência (`D3_CF=RE4`) |
-| `VF_TM_DE4`  | vazio                                    | `F5_CODIGO` usado no `D3_TM` para entrada/devolução da transferência (`D3_CF=DE4`) |
-| Variável          | Padrão                                   | O que faz                                    |
-|-------------------|------------------------------------------|----------------------------------------------|
-| `VF_DSN`          | `postgresql://localhost:5432/vettip12`   | Banco onde aplica                            |
-| `VF_EMPRESA`      | `010`                                    | Sufixo das tabelas (`SC2` → `sc2010`)        |
-| `VF_APPLY`        | `1`                                      | `0` valida e audita, mas não grava           |
-| `VF_FILIAL`       | `04`                                     | Filial padrão das consultas                  |
-| `VF_API_TOKEN`    | vazio                                    | Exigido em `X-API-Token`; vazio = só loopback |
-| `VF_CORS_ORIGINS` | `*`                                      | Origens aceitas, separadas por vírgula       |
-
-O `VF_DSN` usa a role **`postgres`**: a API roda na mesma máquina do banco e
-precisa criar/gravar a tabela de auditoria `vf_mutations`, então uma role só de
-leitura morre no startup. Existiu uma role restrita `vettiflow_app` para acesso
-pela rede; ela foi removida em 14/08/2026, quando cada máquina voltou a ter a
-própria cópia do `vettip12` (ver `db/README.md`).
-
-Cada dev tem o próprio `api/.env`, que **não entra no Git** — o modelo versionado
-é o `api/.env.example`. É ele que guarda DSN, token e senha de cada máquina sem
-gerar conflito.
-
-## Acesso de outra máquina
-
-Esta API abre OP e dá baixa no Protheus. **Nunca a exponha sem token.**
-
-```bash
-export VF_API_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
-./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-Sem `VF_API_TOKEN` definido ela recusa qualquer requisição que não venha do
-loopback, com `503` — esquecer a variável fecha a API em vez de abrir o
-Protheus. Com o token, toda rota responde `401` sem o cabeçalho, `/health`
-inclusive: um `401` já prova que a porta está acessível.
-
-```bash
-curl -H "X-API-Token: $VF_API_TOKEN" http://<ip-do-servidor>:8000/api/v1/health
-```
-
-E o app da outra máquina leva o mesmo token para o build:
-
-```bash
-flutter run \
-  --dart-define=VETTIFLOW_API_URL=http://<ip-do-servidor>:8000 \
-  --dart-define=VETTIFLOW_API_TOKEN=<o-token>
+  --dart-define=VETTIFLOW_API_TOKEN=trocar-por-um-token-interno
 ```
 
 ## Endpoints
 
-| Método | Rota                             | Para quê                                     |
-|--------|----------------------------------|----------------------------------------------|
-| `GET`  | `/api/v1/health`                 | A API está no ar e onde ela grava            |
-| `POST` | `/api/v1/mutations`              | **Armazena** um lote (não aplica ainda)      |
-| `POST` | `/api/v1/finalizar`              | Aplica mutações armazenadas no Protheus      |
-| `GET`  | `/api/v1/mutations/{id}`         | O que aconteceu com uma mutação              |
-| `GET`  | `/api/v1/produtos?query=...`     | Busca produtos para autocomplete             |
-| `GET`  | `/api/v1/produtos/{cod}`         | Produto + estrutura SG1 + saldos por armazém |
-| `GET`  | `/api/v1/ops/{op}/empenhos`      | Empenhos de uma OP, direto da SD4            |
-| `GET`  | `/api/v1/ops/{op}/armazenadas`   | Mutações armazenadas para uma OP             |
-| `GET`  | `/api/v1/produtos/{cod}/saldos`  | Saldo por almoxarifado, direto da SB2        |
+| Metodo | Rota | Para que serve |
+|---|---|---|
+| `GET` | `/api/v1/health` | Confirma conexao com `HMLp12` |
+| `GET` | `/api/v1/write-readiness` | Declara governanca de escrita: `readOnly=true`, `writeEnabled=false`, operacoes bloqueadas e requisitos futuros |
+| `GET` | `/api/v1/produtos?query=...` | Busca produtos para autocomplete |
+| `GET` | `/api/v1/produtos/{codigo}` | Produto, estrutura e saldos |
+| `GET` | `/api/v1/produtos/{codigo}/saldos` | Saldo por almoxarifado |
+| `GET` | `/api/v1/ops/abertas` | OPs em aberto |
+| `GET` | `/api/v1/ops/{op}/empenhos` | Empenhos SD4 da OP |
+| `GET` | `/api/v1/ops/{op}/movimentos` | Snapshot read-only de `SC2`, `SD4` e `SD3` com `PR0`, `RE1`, `ER0`, `DE1`, documento, `D3_NUMSEQ`, perda, ganho e status oficial |
+| `GET` | `/api/v1/ops/{op}/apontamento-preview` | Previa read-only de apontamento, simulando `PR0/001`, `RE1/999`, quantidade restante, saldo de componentes e pendencias de rotina oficial |
+| `GET` | `/api/v1/transferencias` | Snapshot read-only de transferencias `RE4/999` e `DE4/499`, pareando origem, destino, produto, quantidade, documento e status |
+| `GET` | `/api/v1/desmontagens` | Snapshot read-only de desmontagens `RE7/999` e `DE7/499`, separando produto origem, componentes retornados, locais, documento e status |
+| `GET` | `/api/v1/auditoria-estoque` | Snapshot read-only de `ER0/999`, `DE1/499`, `DE0/400` e `RE0/501`, separando tipo, documento, OP, usuario, motivo, produto, local, quantidade e sequencia |
+| `GET` | `/api/v1/almoxarifado` | Visão geral/histórico/estoque/OPs/inventário; filtros, contagem e paginação no servidor |
+| `GET` | `/api/v1/relatorios/almoxarifado` | Relatório de movimentos do 01, filial configurada: totais do recorte completo, série temporal, ranking por produto/unidade e detalhe opcional; somente SELECT |
+| `GET` | `/api/v1/relatorios/{setor}` | Mesmo modelo para `smd` (03), `producao` (05 e SD3 de suas OPs), `suporte` (06/07), `expedicao` (10), `gestao` (locais físicos 01/03/05/06/07/10) |
+| `GET` | `/api/v1/almoxarifado/movimentos/{recno}` | Contrapartes de transferência e desmontagem |
+| `GET` | `/api/v1/producao` | OPs/estoque do 05; histórico do 05 e SD3 vinculados a suas OPs em outros locais, com os mesmos filtros de data e paginação |
+| `GET` | `/api/v1/suporte` | Consulta do 06/07 (parâmetro `local`, padrão 06); mesmas visões e filtros, `kind=fiscal` reúne SD1/SD2 antes de contar/paginar; limite 100 |
+| `GET` | `/api/v1/expedicao` | Consulta física do 10: histórico, notas, estoque, OPs e inventário; mesmos filtros e limite de 100 registros |
+| `GET` | `/api/v1/expedicao/notas/{recno}` | Pedido do item SD2 do 10 e transporte/volumes/rastreio de SF2, por identidade fiscal completa; sem enviar email ou gravar rastreio |
+| `POST` | `/api/v1/mutations` | Bloqueado: somente leitura |
+| `POST` | `/api/v1/finalizar` | Bloqueado: somente leitura |
 
-## Fluxo em duas fases
+### Relatórios de movimentações
 
-1. O app sincroniza a fila com `POST /api/v1/mutations`. As mutações são
-   **armazenadas** com status `armazenado` — nada é escrito em SC2/SD4/SB2.
-2. Quando a Responsável finaliza a OP, o app chama `POST /api/v1/finalizar`
-   com os IDs das mutações a aplicar. Só aí as tabelas do Protheus são
-   escritas.
+Filtros: `start`/`end` juntos em ISO ou ambos omitidos (todo o período), `query`,
+`kinds` repetível, `product`, `op`, `operator`, `document`, `unit`, `cf`, `tm`,
+`tes`, `cfop`, `source` (all/SD3/SD1/SD2), `flow` (all/in/out/none/unknown),
+`status` (all/active/reversed), `details` (boolean). Campos exatos, exceto `query`,
+que busca trecho no produto/descrição/documento/OP. Campos desconhecidos são recusados;
+`local` e filial não são selecionáveis. `warehouses` é repetível e aceita somente os locais do setor (omitido = todos os do setor). Duplicatas são removidas. Fonte e tipo aplicam-se antes de contar.
 
-O `id` de cada mutação continua sendo a chave de idempotência: reenviar para
-`/mutations` devolve o status atual em vez de duplicar; reenviar para
-`/finalizar` uma mutação já aplicada devolve o mesmo `protheusRef`.
+Contrato versionado: `id`, filtros normalizados, origem/filial, janela de consulta,
+`total`, `summary`, `series`, `products`, `items`, contagens de grupos e `detailStatus`.
+Inclui `sector`, `warehouses`, `scopeNote` e `warehouseSummary` para identificar o contexto e o armazém físico. O resumo não depende da paginação da tela. Quantidades não são somadas entre produtos/unidades/armazéns. A produção usa `EXISTS` para vincular OPs sem duplicar movimentos; a gestão usa apenas armazéns físicos distintos, sem somar contextos sobrepostos.
+Detalhe: até 1.000 linhas; acima, `too_large` sem itens. Se a contagem mudar durante
+a leitura, `changed` sem itens. `not_requested` significa que o detalhe não foi solicitado.
+Ranking de até 100 grupos; série de até 120 períodos com registro, com tamanho total informado.
 
-## O que cada mutação faz nas tabelas (ao ser finalizada)
+Até dois relatórios simultâneos por processo; excedentes recebem 429. Orçamento de
+40 segundos para consultas do relatório, com timeout de até 20 por SQL; a cobertura
+global é informativa, usa o cache existente e pode ficar indisponível separadamente.
+Não há cache do relatório, autorização individual ou garantia de snapshot transacional.
+O Flutter gera o PDF com o resultado recebido, sem nova consulta durante a exportação.
 
-| Tipo             | Tabelas tocadas                                        |
-|------------------|--------------------------------------------------------|
-| `aberturaOp`     | `SC2` (a ordem) + `SD4` (empenhos) + `SB2` (`b2_qemp`) |
-| `empenho`        | `SD4` + `SB2` (`b2_qemp`)                              |
-| `transferencia`  | `SB2` (`b2_qatu` nas duas pontas) + `SD3` (`RE4`/`DE4`) |
+Na produção, `analysis` aceita `movements` (padrão), `output`, `orders`, `evolution`,
+`destinations`, `consumption` e `reversals`. As quatro análises de quantidade fixam
+SD3/PR0/sem estorno; a resposta inclui os filtros efetivos e `production` com métricas
+do recorte inteiro e até 100 grupos por produto/unidade. `reversals` inclui ER0 ou
+registros marcados como estornados sem calcular saldo líquido. Nos demais setores,
+somente `movements` é aceito. Tempos, operadores, pausas e qualidade locais não
+passam por esta API: usam a lógica existente do VettiFlow no Flutter.
 
-Sem empenhos no pedido, a abertura de OP explode a estrutura vigente do produto
-(`SG1`), que é o que o Protheus faz sozinho. Com empenhos, eles substituem a
-explosão — é assim que o operador ajusta o que vai compor a OP antes de ela
-existir.
-
-## Detalhes que custaram para descobrir
-
-- **`R_E_C_N_O_` é a chave primária de toda tabela do Protheus** e não é uma
-  sequence do banco: o ERP a gerencia por fora. Inserir sem calcular o próximo
-  deixa tudo em zero e a segunda linha colide.
-- **Todas as colunas são `NOT NULL` e sem default** — a `SC2` tem 151. O
-  `INSERT` é montado a partir do `information_schema`, preenchendo o vazio de
-  cada tipo (`''` para texto, `0` para número). O Protheus não usa `NULL`;
-  gravar `NULL` quebraria as consultas do próprio ERP.
-- **Datas são `varchar(8)` no formato `YYYYMMDD`.**
-- **Filtrar `d_e_l_e_t_ <> '*'`**: o Protheus exclui logicamente.
-- **A vigência faz parte da chave da `SG1`** (`G1_INI`/`G1_FIM`). Sem esse
-  filtro vêm componentes de revisões antigas junto com os atuais.
-- **Saldo negativo é permitido** e acontece de verdade quando o material está a
-  caminho. A API não pode ser mais rígida que o ERP.
-
-## Idempotência
-
-Cada mutação é sua própria transação na finalização. Uma recusa não derruba as
-outras: as recusadas voltam com motivo e continuam na fila do app para o
-operador corrigir.
-
-## Quando o Protheus de verdade entrar
-
-O que troca de dono é `app/protheus.py`: as funções passam a chamar as rotinas
-do ERP (`MATA650` e afins) em vez de escrever nas tabelas. O contrato com o app
-— o envelope da mutação e o formato do resultado — não muda.
+Depois do build, a prévia web local pode ser iniciada na raiz com
+`api/venv/Scripts/python.exe scripts/serve_web.py --port 5174`.
+Esse servidor fica em loopback e fixa o MIME de `.mjs` como `text/javascript`,
+necessário ao PDF.js; no Windows o `python -m http.server` genérico pode herdar
+`text/plain` do registro e impedir a prévia. A hospedagem definitiva precisa
+servir os módulos JavaScript com MIME apropriado.

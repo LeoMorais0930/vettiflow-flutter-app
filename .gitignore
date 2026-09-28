@@ -45,6 +45,7 @@ export-protheus-*/
 .pub/
 /build/
 /coverage/
+/tmp/pdfs/
 
 # Machine-specific — generated with local SDK paths
 android/local.properties

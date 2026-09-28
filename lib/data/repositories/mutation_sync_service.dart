@@ -73,13 +73,11 @@ class MutationSyncService extends ChangeNotifier {
     }
   }
 
-  /// Manda uma mutacao sozinha e ja aplica: armazenar e finalizar em seguida.
+  /// Processa uma mutacao sozinha pelo client configurado.
   ///
   /// Diferente de [sync], que empurra a fila inteira, aqui so esta mutacao
-  /// anda — abrir uma OP nao pode arrastar junto o que alguem deixou pendente
-  /// de proposito. Devolve o status em que a mutacao parou; qualquer coisa
-  /// diferente de [MutationStatus.enviado] significa que o Protheus nao foi
-  /// gravado, e o motivo fica no `erro` da mutacao.
+  /// anda. No modo atual, o client devolve erro local de somente leitura antes
+  /// de qualquer POST para o Protheus.
   Future<MutationStatus> enviarEFinalizar(PendingMutation mutation) async {
     _lastError = null;
     store.updateStatus(mutation.id, status: MutationStatus.enviando);

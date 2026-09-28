@@ -1,8 +1,14 @@
+import 'package:vetti_flow_1_0/shared/models/operator_access.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
 import 'package:vetti_flow_1_0/ui/dashboard/cubit/dashboard_state.dart';
+import 'package:vetti_flow_1_0/ui/warehouse/warehouse_read_page.dart';
+import 'package:vetti_flow_1_0/ui/smd/smd_page.dart';
+import 'package:vetti_flow_1_0/ui/production/production_read_page.dart';
+import 'package:vetti_flow_1_0/ui/support/support_page.dart';
+import 'package:vetti_flow_1_0/ui/expedition/expedition_read_page.dart';
 
 class Sidebar extends StatelessWidget {
   const Sidebar({super.key, required this.viewMode, required this.onViewMode});
@@ -15,7 +21,7 @@ class Sidebar extends StatelessWidget {
     final currentOperator = context
         .watch<OperatorAssignmentStore>()
         .currentOperator;
-    final managerName = currentOperator?.name ?? 'Tatiane';
+    final managerName = currentOperator?.name ?? 'Sem sessão';
     final managerRole = currentOperator?.role ?? 'Coordenadora da producao';
 
     return Container(
@@ -49,7 +55,9 @@ class Sidebar extends StatelessWidget {
               ),
               const SizedBox(height: 9),
               Text(
-                'PAINEL DE PRODUÇÃO',
+                currentOperator?.isAdministrator == true
+                    ? 'ADMINISTRAÇÃO'
+                    : 'MEU PAINEL',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -81,7 +89,7 @@ class Sidebar extends StatelessWidget {
               ),
               _NavItem(
                 icon: _userIcon,
-                label: 'Responsáveis',
+                label: 'Colaboradores',
                 active: viewMode == ViewMode.responsaveis,
                 onTap: () => onViewMode(ViewMode.responsaveis),
               ),
@@ -91,6 +99,23 @@ class Sidebar extends StatelessWidget {
                 active: viewMode == ViewMode.relatorios,
                 onTap: () => onViewMode(ViewMode.relatorios),
               ),
+              const SizedBox(height: 18),
+              const Divider(),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                  child: Text(
+                    'MEUS SETORES',
+                    style: TextStyle(fontSize: 10.5, color: AppColors.muted),
+                  ),
+                ),
+              ),
+              const WarehouseNavigationButton(),
+              const SmdNavigationButton(),
+              const ProductionNavigationButton(),
+              const SupportNavigationButton(),
+              const ExpeditionNavigationButton(),
               const SizedBox(height: 24),
               Container(
                 decoration: const BoxDecoration(
@@ -107,8 +132,8 @@ class Sidebar extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
-                      child: const Text(
-                        'AR',
+                      child: Text(
+                        managerName.characters.first.toUpperCase(),
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 12,

@@ -69,21 +69,21 @@ class _VettiFlowTvPageState extends State<VettiFlowTvPage> {
     final active = store.activeOrders;
     final completed = store.recentCompleted;
 
-    final stored = completed
-        .where((order) => order.currentStage == ProductionStage.storage)
+    final stored = store.orders
+        .where((order) => order.totalStoredQuantity > 0)
         .toList();
     final paused = active
         .where((order) => order.status == ProductionRunStatus.paused)
         .toList();
     final highPriority = active.where((order) => order.isHighPriority).toList();
     final activePieces = active.fold<int>(0, (sum, o) => sum + o.quantity);
-    final storedPieces = stored.fold<int>(
-      0,
-      (sum, o) => sum + o.storedQuantity,
+    final storedPieces = _outputQuantities(
+      stored,
+      (o) => o.totalStoredQuantity,
     );
-    final dispatchedPieces = completed.fold<int>(
-      0,
-      (sum, o) => sum + o.dispatchedQuantity,
+    final dispatchedPieces = _outputQuantities(
+      store.orders,
+      (o) => o.totalDispatchedQuantity,
     );
 
     return Scaffold(
@@ -475,6 +475,24 @@ class _FlowSlide extends StatelessWidget {
 // Slide 3 - Saida e prioridades
 // ---------------------------------------------------------------------------
 
+String _outputQuantities(
+  Iterable<ProductionOrderFlow> orders,
+  num Function(ProductionOrderFlow) quantity,
+) {
+  final totals = <String, num>{};
+  for (final o in orders) {
+    final value = quantity(o);
+    if (value <= 0) continue;
+    final unit = o.unit.isEmpty ? 'un' : o.unit;
+    totals[unit] = (totals[unit] ?? 0) + value;
+  }
+  return totals.isEmpty
+      ? '0'
+      : totals.entries
+            .map((e) => '${formatProductionQuantity(e.value)} ${e.key}')
+            .join(' · ');
+}
+
 class _OutputSlide extends StatelessWidget {
   const _OutputSlide({
     required this.scale,
@@ -488,8 +506,8 @@ class _OutputSlide extends StatelessWidget {
   final double scale;
   final List<ProductionOrderFlow> highPriority;
   final int storedCount;
-  final int storedPieces;
-  final int dispatchedPieces;
+  final String storedPieces;
+  final String dispatchedPieces;
   final ProductionOrderFlow? lastCompleted;
 
   @override
@@ -518,7 +536,7 @@ class _OutputSlide extends StatelessWidget {
               scale: scale,
               big: true,
               label: 'Em estoque',
-              value: '$storedPieces',
+              value: storedPieces,
               helper: '$storedCount OPs armazenadas',
               icon: Icons.warehouse_rounded,
               color: AppColors.primaryDark,
@@ -530,7 +548,7 @@ class _OutputSlide extends StatelessWidget {
               scale: scale,
               big: true,
               label: 'Expedidas',
-              value: '$dispatchedPieces',
+              value: dispatchedPieces,
               helper: lastCompleted == null
                   ? 'Nenhuma finalizada'
                   : 'Ultima: ${lastCompleted!.number}',

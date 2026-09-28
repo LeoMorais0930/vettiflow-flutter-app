@@ -110,6 +110,18 @@ class TestingPage extends StatefulWidget {
 
 class _TestingPageState extends State<TestingPage> {
   var _selectedIndex = 0;
+  bool _initialSelectionApplied = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialSelectionApplied) return;
+    _initialSelectionApplied = true;
+    final number = ModalRoute.of(context)?.settings.arguments;
+    if (number is! String) return;
+    final index = _flowOrders().indexWhere((order) => order.number == number);
+    if (index >= 0) _selectedIndex = index;
+  }
 
   List<ProductionOrderFlow> _flowOrders() => context
       .read<ProductionFlowStore>()
@@ -141,9 +153,9 @@ class _TestingPageState extends State<TestingPage> {
     return TestOperation(
       number: order.number,
       product: order.productLabel,
-      quantity: order.quantityLabel,
-      quantityValue: order.quantity,
-      origin: 'Soldagem',
+      quantity: order.productionQuantityLabel,
+      quantityValue: order.productionQuantity.floor(),
+      origin: order.previousStageLabel,
       receivedAt: _clockLabel(order.updatedAt),
       receivedAgo: order.timings[ProductionStage.testing]?.startedAt == null
           ? 'Aguardando inicio'
@@ -192,7 +204,7 @@ class _TestingPageState extends State<TestingPage> {
     final request = await showPauseReasonDialog(
       context,
       stage: ProductionStage.testing,
-      maxQuantity: order.quantity,
+      maxQuantity: order.productionQuantity.floor(),
     );
     if (!mounted || request == null) return;
     await context.read<ProductionFlowStore>().pauseStage(
@@ -217,17 +229,23 @@ class _TestingPageState extends State<TestingPage> {
       operation,
       defects: defects,
     );
-    if (!mounted || signed != true) return;
+    if (!mounted || signed == null) return;
 
     await context.read<ProductionFlowStore>().completeTesting(
       flowOrder.number,
       defects: defects,
+      operatorName: signed.name,
+      operatorPin: signed.pin,
     );
     if (!mounted) return;
-    final totalDefects = defects.fold<int>(0, (sum, d) => sum + d.quantity);
-    final suffix = defects.isEmpty
-        ? 'aprovada para expedicao.'
-        : 'concluida com $totalDefects dispositivo${totalDefects == 1 ? '' : 's'} em defeito.';
+    final current = context.read<ProductionFlowStore>().orders.firstWhere(
+      (o) => o.number == flowOrder.number,
+    );
+    final suffix = current.currentStage == ProductionStage.testing
+        ? 'sua sessão foi concluída. Há outros operadores nesta etapa.'
+        : current.isDone
+        ? 'sequência concluída no VettiFlow.'
+        : 'liberada para ${current.currentStage.label}.';
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('${operation.number} $suffix')));
@@ -1182,7 +1200,7 @@ class _TestingActions extends StatelessWidget {
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Teste assinado. Aprovados seguem para expedicao e defeitos para suporte.',
+                'O teste será registrado e a OP seguirá a sequência planejada. Defeitos ficam disponíveis para o suporte.',
                 style: TextStyle(
                   color: AppColors.green,
                   fontSize: 13,
@@ -1783,7 +1801,7 @@ class _DefectChip extends StatelessWidget {
   }
 }
 
-Future<bool?> showTestPinDialog(
+Future<Operator?> showTestPinDialog(
   BuildContext context,
   TestOperation operation, {
   List<DefectRecord> defects = const [],
@@ -1791,7 +1809,7 @@ Future<bool?> showTestPinDialog(
   final compact = MediaQuery.sizeOf(context).width < 720;
 
   if (compact) {
-    return showModalBottomSheet<bool>(
+    return showModalBottomSheet<Operator>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -1800,7 +1818,7 @@ Future<bool?> showTestPinDialog(
     );
   }
 
-  return showDialog<bool>(
+  return showDialog<Operator>(
     context: context,
     builder: (context) => Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
@@ -1983,7 +2001,7 @@ class _TestPinSheetState extends State<_TestPinSheet> {
               Expanded(
                 child: _DialogButton(
                   label: 'Cancelar',
-                  onPressed: () => Navigator.of(context).pop(false),
+                  onPressed: () => Navigator.of(context).pop(),
                   fillColor: const Color(0xFFF6F9FB),
                   foregroundColor: AppColors.muted,
                   borderColor: AppColors.border,
@@ -1994,7 +2012,7 @@ class _TestPinSheetState extends State<_TestPinSheet> {
                 child: _DialogButton(
                   label: 'Concluir OP',
                   onPressed: valid
-                      ? () => Navigator.of(context).pop(true)
+                      ? () => Navigator.of(context).pop(_operator)
                       : null,
                   fillColor: valid ? AppColors.green : const Color(0xFFE4EDF4),
                   foregroundColor: valid ? Colors.white : AppColors.muted,

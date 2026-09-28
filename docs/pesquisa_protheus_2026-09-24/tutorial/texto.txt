@@ -1,0 +1,132 @@
+Procedimento: Desmontagem de Produtos no Protheus
+Rotina MATA242 — SIGAEST | Estoque/Custos
+Versão: 1.0  |  Data: 29/06/2026  |  Elaborado por: T.I.
+
+1. O que é a Desmontagem de Produtos?
+A Desmontagem de Produtos (MATA242) é a rotina do Protheus que transfere o saldo de estoque de um produto de origem para um ou mais produtos de destino, gerando movimentações internas do tipo RE7 (Recebimento) e DE7 (Devolução). Use sempre que precisar:
+
+Desmontar um produto acabado devolvendo seus componentes ao estoque;
+Transferir saldo de 1 produto para outro com quantidades diferentes;
+Reprocessar itens sem movimentação para reaproveitar componentes.
+
+2. Onde acessar a rotina
+Caminho no menu: Atualizações → Movimentações → Internas → Desmontagem
+Ou acesse diretamente pelo SmartLink: MATA242
+
+3. Passo a passo de execução
+MATA242 — Acesse a rotina 
+Vá em Atualizações → Movimentações → Internas → Desmontagem e clique em Incluir.
+Preencha o cabeçalho da desmontagem
+
+Campo
+O que informar
+Obrigatório?
+Produto Origem
+Código do produto que será desmontado (produto pai)
+✔ Sim
+Armazém
+Armazém de onde o produto está saindo
+✔ Sim
+Quantidade
+Quantidade a ser desmontada (não pode ser maior que o saldo disponível)
+✔ Sim
+Documento
+Número do documento de referência (ex: 0001)
+✔ Sim
+Data
+Data da movimentação (preenchida automaticamente)
+Automático
+Lote / Sub-lote
+Preencher apenas se o produto controlar lote
+Se aplicável
+
+Carregue os componentes (produtos destino)
+Clique em Outras Ações → 1º Nível. O sistema preencherá automaticamente os itens destino com base na estrutura do produto. Se não houver estrutura cadastrada, insira os itens manualmente.
+Informe o rateio de custo de cada componente
+Para cada linha de produto destino, informe o % de Rateio. Veja a seção 4 para entender como calcular.
+
+Confirme a desmontagem
+Clique em Salvar. O sistema irá gerar as movimentações RE7/DE7 e atualizar os saldos de estoque automaticamente.
+
+4. Como calcular o rateio de custo
+O campo % Rateio define qual percentual do custo total do produto de origem será transferido para cada componente. A soma de todos os itens deve ser exatamente 100%. O sistema não calcula isso automaticamente — você precisa informar manualmente.
+
+Como consultar o custo médio de cada componente:
+No Protheus: acesse 
+SIGAEST → Atualizações → Saldos → Atual → pesquise o produto → campo Custo Médio.
+
+Fórmula do rateio:
+% Rateio do componente  =  ( Custo Médio do componente × Qtd destino )  ÷  Custo Total do produto origem  ×  100
+Onde: Custo Total do produto origem = Custo Médio origem × Qtd desmontada
+
+5. Exemplo prático de rateio
+Situação: desmontar 10 unidades do produto PA-001 (Custo Médio = R$ 50,00 cada), gerando dois componentes:
+
+Componente (destino)
+Qtd destino
+Custo Médio unit.
+Custo Total do componente
+% Rateio
+MP-010 — Cabo de antena
+10 un
+R$ 30,00
+R$ 300,00
+60,00%
+MP-020 — Suporte
+10 un
+R$ 15,00
+R$ 150,00
+30,00%
+MP-030 — Parafuso
+10 un
+R$ 5,00
+R$ 50,00
+10,00%
+TOTAL
+—
+—
+R$ 500,00
+100,00% ✔
+
+Custo Total do produto origem: 10 × R$ 50,00 = R$ 500,00
+Rateio MP-010: (R$ 300,00 ÷ R$ 500,00) × 100 = 60,00%
+Rateio MP-020: (R$ 150,00 ÷ R$ 500,00) × 100 = 30,00%
+Rateio MP-030: (R$ 50,00 ÷ R$ 500,00) × 100 = 10,00%
+
+⚠  Atenção: Se a soma dos percentuais não fechar exatamente 100%, o Protheus não deixará salvar. Ajuste o último item para compensar centavos de arredondamento.
+
+
+6. Erros comuns e como resolver
+Código do erro
+Mensagem
+Causa
+Solução
+MA242PR
+Algum campo obrigatório não foi preenchido
+Campo em branco no cabeçalho
+Verifique Produto, Armazém, Quantidade e Documento
+A242RATEIO
+A soma dos percentuais não pode ultrapassar 100%
+Soma dos rateios > 100%
+Ajuste os valores de forma que somem exatamente 100%
+Sem erro, mas sem componente
+Tela de itens aparece em branco após 1º Nível
+Produto sem estrutura cadastrada
+Insira os itens de destino manualmente
+Saldo insuficiente
+Quantidade maior que saldo disponível
+Qtd solicitada > saldo no armazém
+Consulte o saldo real em Estoque → Saldos antes de lançar
+
+7. Checklist antes de confirmar
+☐  Produto origem e armazém corretos
+☐  Quantidade disponível em estoque (consulte saldos antes)
+☐  Todos os componentes destino listados
+☐  Soma dos rateios = exatamente 100,00%
+☐  Documento preenchido para rastreabilidade
+☐  Em caso de dúvida, acionar o T.I. antes de confirmar
+
+
+
+
+

@@ -25,7 +25,7 @@ class FirmwarePage extends StatefulWidget {
     this.operatorRole = 'Gravacao',
     this.origin = 'SMD',
     this.emptyText = 'Nenhuma OP aguardando firmware.',
-    this.queueSubtitle = 'Liberadas pela SMD para gravacao.',
+    this.queueSubtitle = 'OPs direcionadas para esta etapa.',
     this.runningMetricLabel = 'Em gravacao',
     this.nextStageLabel = 'Soldagem',
     this.startLabel = 'Iniciar gravacao',
@@ -71,6 +71,18 @@ class FirmwarePage extends StatefulWidget {
 
 class _FirmwarePageState extends State<FirmwarePage> {
   var _selectedIndex = 0;
+  bool _initialSelectionApplied = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialSelectionApplied) return;
+    _initialSelectionApplied = true;
+    final number = ModalRoute.of(context)?.settings.arguments;
+    if (number is! String) return;
+    final index = _flowOrders().indexWhere((order) => order.number == number);
+    if (index >= 0) _selectedIndex = index;
+  }
 
   List<ProductionOrderFlow> _flowOrders() =>
       context.read<ProductionFlowStore>().ordersAtStage(widget.stage);
@@ -87,8 +99,8 @@ class _FirmwarePageState extends State<FirmwarePage> {
     return FirmwareOperation(
       number: order.number,
       product: order.productLabel,
-      quantity: order.quantityLabel,
-      origin: widget.origin,
+      quantity: order.productionQuantityLabel,
+      origin: order.previousStageLabel,
       receivedAt: _timeLabel(order.updatedAt),
       receivedAgo: order.timings[widget.stage]?.startedAt == null
           ? 'Aguardando inicio'
@@ -126,7 +138,7 @@ class _FirmwarePageState extends State<FirmwarePage> {
     final request = await showPauseReasonDialog(
       context,
       stage: widget.stage,
-      maxQuantity: order.quantity,
+      maxQuantity: order.productionQuantity.floor(),
     );
     if (!mounted || request == null) return;
     await context.read<ProductionFlowStore>().pauseStage(
@@ -152,7 +164,7 @@ class _FirmwarePageState extends State<FirmwarePage> {
     final defects = widget.collectDefectsOnComplete
         ? await showFirmwareDefectsDialog(
             context,
-            maxQuantity: flowOrder.quantity,
+            maxQuantity: flowOrder.productionQuantity.floor(),
           )
         : const <DefectRecord>[];
     if (!mounted || defects == null) return;
@@ -176,7 +188,16 @@ class _FirmwarePageState extends State<FirmwarePage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '${flowOrder.number} liberada para ${widget.completionSnackTarget}.',
+          context
+                      .read<ProductionFlowStore>()
+                      .orders
+                      .firstWhere((o) => o.number == flowOrder.number)
+                      .currentStage ==
+                  flowOrder.currentStage
+              ? '${flowOrder.number}: sua participação foi concluída.'
+              : flowOrder.nextStage == ProductionStage.completed
+              ? '${flowOrder.number}: sequência concluída no VettiFlow.'
+              : '${flowOrder.number} liberada para ${flowOrder.nextStage.label}.',
         ),
       ),
     );
@@ -289,7 +310,7 @@ class _FirmwarePageState extends State<FirmwarePage> {
           operatorRole: displayOperatorRole,
           queueSubtitle: widget.queueSubtitle,
           runningMetricLabel: widget.runningMetricLabel,
-          nextStageLabel: widget.nextStageLabel,
+          nextStageLabel: flowOrders[_selectedIndex].nextStageLabel,
           startLabel: widget.startLabel,
           resumeLabel: widget.resumeLabel,
           completeLabel: widget.completeLabel,

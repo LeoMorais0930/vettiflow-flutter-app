@@ -19,6 +19,7 @@ class NovaOrdemDTO {
   final String responsavel;
   final String? prazo;
   final String prioridade;
+  final List<ProductionStage> plannedStages;
 
   const NovaOrdemDTO({
     required this.produto,
@@ -35,6 +36,7 @@ class NovaOrdemDTO {
     required this.responsavel,
     this.prazo,
     this.prioridade = 'Media',
+    this.plannedStages = const [],
   });
 }
 
@@ -43,11 +45,10 @@ abstract class OpRepository {
   Future<List<OrdemArmazenada>> fetchOrdensArmazenadas();
   Future<OrdemProducao> criarOrdem(NovaOrdemDTO dto);
 
-  /// Como foi a ida ao Protheus da ultima OP aberta por [criarOrdem].
+  /// Como ficou o rascunho Protheus da ultima OP aberta por [criarOrdem].
   ///
-  /// `null` quando nao houve tentativa (repositorio mock, modo offline). Quem
-  /// implementa de verdade sobrescreve; a tela le logo apos o `await` para
-  /// avisar o operador quando a SC2/SD4 nao foram gravadas.
+  /// `null` quando nao houve tentativa. A tela le logo apos o `await` para
+  /// avisar o operador que a escrita real no Protheus segue bloqueada.
   ProtheusPublishOutcome? get ultimoEnvioProtheus => null;
 
   Future<void> avancarStatus(

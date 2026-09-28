@@ -31,6 +31,16 @@
 
   <title>vetti_flow_1_0</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    // Bundled PDF renderer: preview does not fetch application reports or fonts from a CDN.
+    window.dartPdfJsBaseUrl = new URL('pdfjs/', document.baseURI).href;
+  </script>
+  <script type="module">
+    // Preload the local renderer before the user opens a PDF preview.
+    import * as pdfjs from './pdfjs/pdf.min.mjs';
+    window.pdfjsLib = pdfjs;
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs/pdf.worker.min.mjs', document.baseURI).href;
+  </script>
 </head>
 <body>
   <!--

@@ -6,6 +6,8 @@ import 'package:vetti_flow_1_0/data/models/production_flow.dart';
 import 'package:vetti_flow_1_0/data/repositories/production_flow_store.dart';
 import 'package:vetti_flow_1_0/shared/models/operator.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
+import 'package:vetti_flow_1_0/data/models/warehouse_report.dart';
+import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
 
 /// Aba "Relatórios" do painel de produção.
 ///
@@ -21,6 +23,21 @@ class ReportsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final orders = context.watch<ProductionFlowStore>().orders;
+    final operator = context.watch<OperatorAssignmentStore?>()?.currentOperator;
+    final generalManagement =
+        operator?.canManageAssignments == true && operator?.managesArea == null;
+    final sectors = generalManagement
+        ? ReportSector.values
+        : switch (visibleArea) {
+            WorkArea.warehouse => [ReportSector.warehouse],
+            WorkArea.smd => [ReportSector.smd],
+            WorkArea.support => [ReportSector.support],
+            WorkArea.production => [
+              ReportSector.production,
+              ReportSector.expedition,
+            ],
+            _ => <ReportSector>[],
+          };
     final report = ProductionReport(
       orders,
       DateTime.now(),
@@ -30,6 +47,36 @@ class ReportsView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (sectors.isNotEmpty) ...[
+          const Text(
+            'Relatórios do Protheus',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final sector in sectors)
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.summarize_outlined, size: 18),
+                  label: Text(
+                    sector == ReportSector.management
+                        ? 'Consolidado geral'
+                        : sector.label,
+                  ),
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed(sector.route),
+                ),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
+        const Text(
+          'VettiFlow · dados locais deste dispositivo',
+          style: TextStyle(color: AppColors.muted, fontSize: 13),
+        ),
+        const SizedBox(height: 10),
         _ReportsHeader(report: report),
         const SizedBox(height: 18),
         if (report.orders.isEmpty)
@@ -223,9 +270,9 @@ class ProductionReport {
   void _compute() {
     totalOrders = orders.length;
     for (final order in orders) {
+      if (order.totalStoredQuantity > 0) storedOrders++;
       if (order.isDone) {
         finishedOrders++;
-        if (order.currentStage == ProductionStage.storage) storedOrders++;
         final finished = finishedAt(order);
         if (finished != null || visibleArea != null) {
           final elapsed = visibleArea == null
@@ -1680,7 +1727,7 @@ class _StatusChip extends StatelessWidget {
     final String label;
     final Color color;
     final Color bg;
-    if (order.currentStage == ProductionStage.storage) {
+    if (order.totalStoredQuantity > 0 && order.isDone) {
       label = 'Armazenada';
       color = AppColors.primary;
       bg = AppColors.bgAndamento;

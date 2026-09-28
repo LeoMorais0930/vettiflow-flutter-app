@@ -33,6 +33,11 @@ class WarehouseRouteTarget {
 class WarehouseRouting {
   const WarehouseRouting._();
 
+  // Locais utilizados pela operação. Outros códigos ficam apenas no histórico.
+  static const operationalCodes = ['01', '03', '05', '06', '07', '10'];
+  static List<WarehouseRouteTarget> get operational =>
+      all.where((target) => operationalCodes.contains(target.code)).toList();
+
   static const _productionStages = [
     WorkStage.firmware,
     WorkStage.soldering,
@@ -56,6 +61,16 @@ class WarehouseRouting {
       stages: [WorkStage.smd],
       primaryStage: WorkStage.smd,
       responsibleName: 'Paula',
+    ),
+    WarehouseRouteTarget(
+      code: '04',
+      name: 'PTH',
+      area: WorkArea.production,
+      stages: _productionStages,
+      primaryStage: WorkStage.firmware,
+      responsibleName: 'Tatiane',
+      hasDedicatedScreen: false,
+      note: 'Local oficial PRODUCAO PTH; tela dedicada ainda pendente.',
     ),
     WarehouseRouteTarget(
       code: '05',
@@ -89,12 +104,93 @@ class WarehouseRouting {
       primaryStage: WorkStage.expedition,
       responsibleName: 'Rafaela',
     ),
+    WarehouseRouteTarget(
+      code: '02',
+      name: 'USA',
+      area: WorkArea.system,
+      stages: [WorkStage.warehouse],
+      primaryStage: WorkStage.warehouse,
+      responsibleName: '',
+      hasDedicatedScreen: false,
+      note: 'Estoque especial oficial; regra operacional pendente.',
+    ),
+    WarehouseRouteTarget(
+      code: '08',
+      name: 'Itens obsoletos',
+      area: WorkArea.system,
+      stages: [WorkStage.warehouse],
+      primaryStage: WorkStage.warehouse,
+      responsibleName: '',
+      hasDedicatedScreen: false,
+      note: 'Estoque especial oficial; regra operacional pendente.',
+    ),
+    WarehouseRouteTarget(
+      code: '11',
+      name: 'Estoque Adrian',
+      area: WorkArea.system,
+      stages: [WorkStage.warehouse],
+      primaryStage: WorkStage.warehouse,
+      responsibleName: '',
+      hasDedicatedScreen: false,
+      note: 'Estoque especial oficial; regra operacional pendente.',
+    ),
+    WarehouseRouteTarget(
+      code: '12',
+      name: 'Entrega futura',
+      area: WorkArea.system,
+      stages: [WorkStage.warehouse],
+      primaryStage: WorkStage.warehouse,
+      responsibleName: '',
+      hasDedicatedScreen: false,
+      note: 'Estoque especial oficial; regra operacional pendente.',
+    ),
+    WarehouseRouteTarget(
+      code: '70',
+      name: 'Terceiros - Mauro',
+      area: WorkArea.production,
+      stages: [WorkStage.warehouse],
+      primaryStage: WorkStage.warehouse,
+      responsibleName: '',
+      hasDedicatedScreen: false,
+      note: 'Fluxo de terceiros pendente.',
+    ),
+    WarehouseRouteTarget(
+      code: '71',
+      name: 'Terceiros - Fenix Jundiai',
+      area: WorkArea.production,
+      stages: [WorkStage.warehouse],
+      primaryStage: WorkStage.warehouse,
+      responsibleName: '',
+      hasDedicatedScreen: false,
+      note: 'Fluxo de terceiros pendente.',
+    ),
+    WarehouseRouteTarget(
+      code: '72',
+      name: 'Terceiros - Gwands SP',
+      area: WorkArea.production,
+      stages: [WorkStage.warehouse],
+      primaryStage: WorkStage.warehouse,
+      responsibleName: '',
+      hasDedicatedScreen: false,
+      note: 'Fluxo de terceiros pendente.',
+    ),
+    WarehouseRouteTarget(
+      code: '73',
+      name: 'Terceiros - Trafo',
+      area: WorkArea.production,
+      stages: [WorkStage.warehouse],
+      primaryStage: WorkStage.warehouse,
+      responsibleName: '',
+      hasDedicatedScreen: false,
+      note: 'Fluxo de terceiros pendente.',
+    ),
   ];
 
   static const _operatorWarehouseAccess = {
     'tatiane': ['05', '10'],
     'andressa': ['05'],
     'vera': ['01'],
+    'luis': ['01'],
     'paula': ['03'],
     'bruno': ['06', '07'],
     'bruna': ['10'],
@@ -130,7 +226,7 @@ class WarehouseRouting {
   }
 
   static List<String> orderCreationWarehousesForOperator(String? operatorName) {
-    return all.map((target) => target.code).toList()..sort();
+    return [...operationalCodes];
   }
 
   static bool canOperatorUseWarehouse(String? operatorName, String warehouse) {
@@ -142,7 +238,7 @@ class WarehouseRouting {
   }
 
   static bool canOperatorCreateOrder(String? operatorName, String warehouse) {
-    return byCode(warehouse) != null;
+    return operationalCodes.contains(normalizeCode(warehouse));
   }
 
   static bool canSourceMaterialFromWarehouse(String warehouse) {

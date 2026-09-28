@@ -5,15 +5,22 @@ import 'package:vetti_flow_1_0/data/repositories/flow_op_repository.dart';
 import 'package:vetti_flow_1_0/data/repositories/mutation_sync_service.dart';
 import 'package:vetti_flow_1_0/data/repositories/op_repository.dart';
 import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
+import 'package:vetti_flow_1_0/data/repositories/local_json_persistence.dart';
 import 'package:vetti_flow_1_0/data/repositories/pending_mutation_store.dart';
 import 'package:vetti_flow_1_0/data/repositories/production_flow_database.dart';
 import 'package:vetti_flow_1_0/data/repositories/production_flow_store.dart';
-import 'package:vetti_flow_1_0/data/repositories/protheus_order_publisher.dart';
-import 'package:vetti_flow_1_0/data/repositories/protheus_connection_store.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_completion_preview_repository.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_dismantling_repository.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_inventory_audit_repository.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_op_movement_repository.dart';
 import 'package:vetti_flow_1_0/data/repositories/protheus_product_repository.dart';
 import 'package:vetti_flow_1_0/data/repositories/protheus_sync_client.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_transfer_repository.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_warehouse_repository.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_write_readiness_repository.dart';
 import 'package:vetti_flow_1_0/data/repositories/warehouse_request_database.dart';
 import 'package:vetti_flow_1_0/data/repositories/warehouse_request_store.dart';
+import 'package:vetti_flow_1_0/data/repositories/warehouse_read_repository.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_theme.dart';
 
 class VettiFlowApp extends StatelessWidget {
@@ -26,38 +33,22 @@ class VettiFlowApp extends StatelessWidget {
 
   static const _apiToken = String.fromEnvironment('VETTIFLOW_API_TOKEN');
 
-  static const _connectionMode = String.fromEnvironment(
-    'VETTIFLOW_PROTHEUS_CONNECTION_MODE',
-  );
-
-  static const _allowDirectPostgresFallback = bool.fromEnvironment(
-    'VETTIFLOW_ALLOW_DIRECT_POSTGRES_FALLBACK',
-    defaultValue: true,
-  );
-
-  static ProtheusConnectionMode _initialConnectionMode() {
-    if (_connectionMode.trim().isNotEmpty) {
-      return protheusConnectionModeFromName(_connectionMode);
-    }
-    if (!_allowDirectPostgresFallback) return ProtheusConnectionMode.fastApi;
-    return ProtheusConnectionMode.automatic;
-  }
-
-  static bool _useDirectPostgres() =>
-      _allowDirectPostgresFallback &&
-      _initialConnectionMode() != ProtheusConnectionMode.fastApi;
-
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<ProductionFlowDatabase>(
-          create: (_) => _useDirectPostgres()
-              ? PostgresProductionFlowDatabase()
-              : const EmptyProductionFlowDatabase(),
+        Provider<WarehouseReadRepository>(
+          create: (_) => WarehouseReadRepository(
+            baseUrl: _apiBaseUrl,
+            apiToken: _apiToken,
+          ),
+          dispose: (_, repository) => repository.close(),
         ),
-        // A fila de mutacoes nasce antes do fluxo de producao: abrir OP ja
-        // manda para o Protheus, entao o store precisa do publicador pronto.
+        Provider<ProductionFlowDatabase>(
+          create: (_) => const EmptyProductionFlowDatabase(),
+        ),
+        // A fila de mutacoes nasce antes do fluxo de producao para guardar
+        // rascunhos locais. O Protheus segue somente leitura.
         ChangeNotifierProvider<PendingMutationStore>(
           create: (_) => PendingMutationStore(),
         ),
@@ -75,44 +66,67 @@ class VettiFlowApp extends StatelessWidget {
         ChangeNotifierProvider<ProductionFlowStore>(
           create: (context) => ProductionFlowStore(
             database: context.read<ProductionFlowDatabase>(),
-            protheusPublisher: MutationProtheusOrderPublisher(
-              mutations: context.read<PendingMutationStore>(),
-              sync: context.read<MutationSyncService>(),
-            ),
           ),
         ),
         ChangeNotifierProvider<OperatorAssignmentStore>(
-          create: (_) => OperatorAssignmentStore(),
-        ),
-        ChangeNotifierProvider<ProtheusConnectionStore>(
-          create: (_) =>
-              ProtheusConnectionStore(initialMode: _initialConnectionMode()),
+          create: (_) => OperatorAssignmentStore(
+            persistence: const LocalJsonPersistence(
+              'vetti_flow.operator_access.v1',
+            ),
+          ),
         ),
         ChangeNotifierProvider<WarehouseRequestStore>(
           create: (_) => WarehouseRequestStore(
-            database: _useDirectPostgres()
-                ? PostgresWarehouseRequestDatabase()
-                : const EmptyWarehouseRequestDatabase(),
+            database: const LocalWarehouseRequestDatabase(),
           ),
         ),
-        ProxyProvider<ProtheusConnectionStore, ProtheusProductRepository>(
-          update: (_, connection, _) {
-            final apiRepository = ApiProtheusProductRepository(
-              baseUrl: _apiBaseUrl,
-              apiToken: _apiToken,
-            );
-            switch (connection.mode) {
-              case ProtheusConnectionMode.fastApi:
-                return apiRepository;
-              case ProtheusConnectionMode.localPostgres:
-                return PostgresProtheusProductRepository();
-              case ProtheusConnectionMode.automatic:
-                return ApiFirstProtheusProductRepository(
-                  primary: apiRepository,
-                  fallback: PostgresProtheusProductRepository(),
-                );
-            }
-          },
+        Provider<ProtheusProductRepository>(
+          create: (_) => ApiProtheusProductRepository(
+            baseUrl: _apiBaseUrl,
+            apiToken: _apiToken,
+          ),
+        ),
+        Provider<ProtheusWarehouseRepository>(
+          create: (_) => ApiProtheusWarehouseRepository(
+            baseUrl: _apiBaseUrl,
+            apiToken: _apiToken,
+          ),
+        ),
+        Provider<ProtheusOpMovementRepository>(
+          create: (_) => ApiProtheusOpMovementRepository(
+            baseUrl: _apiBaseUrl,
+            apiToken: _apiToken,
+          ),
+        ),
+        Provider<ProtheusCompletionPreviewRepository>(
+          create: (_) => ApiProtheusCompletionPreviewRepository(
+            baseUrl: _apiBaseUrl,
+            apiToken: _apiToken,
+          ),
+        ),
+        Provider<ProtheusTransferRepository>(
+          create: (_) => ApiProtheusTransferRepository(
+            baseUrl: _apiBaseUrl,
+            apiToken: _apiToken,
+          ),
+        ),
+        Provider<ProtheusDismantlingRepository>(
+          create: (_) => ApiProtheusDismantlingRepository(
+            baseUrl: _apiBaseUrl,
+            apiToken: _apiToken,
+          ),
+        ),
+        Provider<ProtheusInventoryAuditRepository>(
+          create: (_) => ApiProtheusInventoryAuditRepository(
+            baseUrl: _apiBaseUrl,
+            apiToken: _apiToken,
+          ),
+        ),
+        Provider<ProtheusWriteReadinessRepository>(
+          create: (_) => ApiProtheusWriteReadinessRepository(
+            baseUrl: _apiBaseUrl,
+            apiToken: _apiToken,
+          ),
         ),
         ProxyProvider3<
           ProductionFlowStore,

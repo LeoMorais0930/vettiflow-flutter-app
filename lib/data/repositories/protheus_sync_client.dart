@@ -4,6 +4,32 @@ import 'package:http/http.dart' as http;
 import 'package:vetti_flow_1_0/data/models/pending_mutation.dart';
 import 'package:vetti_flow_1_0/data/repositories/api_settings.dart';
 
+class ProtheusHealth {
+  const ProtheusHealth({
+    required this.ok,
+    required this.database,
+    required this.company,
+    required this.readOnly,
+    required this.applying,
+  });
+
+  final bool ok;
+  final String database;
+  final String company;
+  final bool readOnly;
+  final bool applying;
+
+  factory ProtheusHealth.fromJson(Map<String, dynamic> json) {
+    return ProtheusHealth(
+      ok: json['ok'] == true,
+      database: json['banco']?.toString().trim() ?? '',
+      company: json['empresa']?.toString().trim() ?? '',
+      readOnly: json['readOnly'] != false,
+      applying: json['aplicando'] == true,
+    );
+  }
+}
+
 class MutationResult {
   const MutationResult({
     required this.id,
@@ -63,84 +89,59 @@ class ProtheusSyncClient {
   }
 
   Future<bool> health() async {
+    final info = await healthInfo();
+    return info.ok;
+  }
+
+  Future<ProtheusHealth> healthInfo() async {
     try {
       final response = await _http
           .get(_uri('/api/v1/health'), headers: _headers())
           .timeout(_timeout);
-      return response.statusCode == 200;
+      if (response.statusCode != 200) {
+        return const ProtheusHealth(
+          ok: false,
+          database: '',
+          company: '',
+          readOnly: true,
+          applying: false,
+        );
+      }
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ProtheusHealth.fromJson(body);
     } catch (_) {
-      return false;
+      return const ProtheusHealth(
+        ok: false,
+        database: '',
+        company: '',
+        readOnly: true,
+        applying: false,
+      );
     }
   }
 
   Future<List<MutationResult>> push(List<PendingMutation> mutations) async {
     if (mutations.isEmpty) return const [];
-
-    final http.Response response;
-    try {
-      response = await _http
-          .post(
-            _uri('/api/v1/mutations'),
-            headers: _headers(json: true),
-            body: jsonEncode({
-              'mutations': [
-                for (final mutation in mutations) mutation.toJson(),
-              ],
-            }),
-          )
-          .timeout(_timeout);
-    } catch (error) {
-      throw SyncUnavailableException(error.toString());
-    }
-
-    if (response.statusCode != 200) {
-      throw SyncUnavailableException(
-        'HTTP ${response.statusCode}: ${response.body}',
-      );
-    }
-
-    try {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final results = (body['results'] as List<dynamic>?) ?? const [];
-      return results
-          .map((item) => MutationResult.fromJson(item as Map<String, dynamic>))
-          .toList(growable: false);
-    } catch (error) {
-      throw SyncUnavailableException('resposta ilegivel: $error');
-    }
+    return [
+      for (final mutation in mutations)
+        MutationResult(
+          id: mutation.id,
+          status: MutationStatus.erro,
+          erro: 'Protheus em modo somente leitura. Nenhum dado foi enviado.',
+        ),
+    ];
   }
 
   Future<List<MutationResult>> finalizar(List<String> ids) async {
     if (ids.isEmpty) return const [];
-
-    final http.Response response;
-    try {
-      response = await _http
-          .post(
-            _uri('/api/v1/finalizar'),
-            headers: _headers(json: true),
-            body: jsonEncode({'ids': ids}),
-          )
-          .timeout(_timeout);
-    } catch (error) {
-      throw SyncUnavailableException(error.toString());
-    }
-
-    if (response.statusCode != 200) {
-      throw SyncUnavailableException(
-        'HTTP ${response.statusCode}: ${response.body}',
-      );
-    }
-
-    try {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final results = (body['results'] as List<dynamic>?) ?? const [];
-      return results
-          .map((item) => MutationResult.fromJson(item as Map<String, dynamic>))
-          .toList(growable: false);
-    } catch (error) {
-      throw SyncUnavailableException('resposta ilegivel: $error');
-    }
+    return [
+      for (final id in ids)
+        MutationResult(
+          id: id,
+          status: MutationStatus.erro,
+          erro: 'Protheus em modo somente leitura. Nenhum dado foi aplicado.',
+        ),
+    ];
   }
 
   void dispose() => _http.close();

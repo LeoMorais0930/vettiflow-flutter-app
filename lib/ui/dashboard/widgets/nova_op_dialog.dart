@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:vetti_flow_1_0/ui/production/production_route_field.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -51,6 +52,11 @@ class _NovaOpDialogState extends State<NovaOpDialog> {
   var _lookupRequest = 0;
   var _isLookingUp = false;
   int _qtd = 50;
+  List<ProductionStage> _plannedStages = [...ProductionRouteField.available];
+  bool get _canPlanProduction => [
+    'tatiane',
+    'andressa',
+  ].contains(widget.currentOperatorName?.trim().toLowerCase());
   String _prazo = '';
   String _prioridade = 'Media';
   String _filial = '04';
@@ -114,6 +120,10 @@ class _NovaOpDialogState extends State<NovaOpDialog> {
         responsavel: '',
         prazo: _prazo.trim().isEmpty ? null : _prazo.trim(),
         prioridade: _prioridade,
+        plannedStages:
+            _canPlanProduction && (_armazem.isEmpty || _armazem == '05')
+            ? _plannedStages
+            : const [],
       ),
     );
   }
@@ -618,6 +628,15 @@ class _NovaOpDialogState extends State<NovaOpDialog> {
                 ],
               ),
               const SizedBox(height: 15),
+              if (_canPlanProduction &&
+                  (_armazem.isEmpty || _armazem == '05')) ...[
+                ProductionRouteField(
+                  stages: _plannedStages,
+                  onChanged: (stages) =>
+                      setState(() => _plannedStages = stages),
+                ),
+                const SizedBox(height: 15),
+              ],
               _FormField(
                 label: 'Prioridade',
                 child: DropdownButtonFormField<String>(

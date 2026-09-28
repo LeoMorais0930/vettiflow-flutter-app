@@ -84,12 +84,15 @@ class OrdemProducao {
   final bool atrasada;
   final String prioridade;
   final String armazem;
+  final String localConsumoComponentes;
+  final String localEntradaAcabado;
+  final List<String> roteamentoAvisos;
 
   /// Etapa real da OP no fluxo de produção (fonte: ProductionFlowStore).
   final ProductionStage stage;
 
   /// Materiais (BOM) do produto: (descrição, quantidade por unidade).
-  final List<(String, int)> materiais;
+  final List<(String, num)> materiais;
   final List<MaterialOpDetalhe> materiaisDetalhados;
   final List<ResumoPausaOp> pausas;
   final String tempoTotal;
@@ -111,6 +114,9 @@ class OrdemProducao {
     this.atrasada = false,
     this.prioridade = 'Media',
     this.armazem = '',
+    this.localConsumoComponentes = '',
+    this.localEntradaAcabado = '',
+    this.roteamentoAvisos = const [],
     this.stage = ProductionStage.warehouse,
     this.materiais = const [],
     this.materiaisDetalhados = const [],
@@ -146,8 +152,11 @@ class OrdemProducao {
     bool? atrasada,
     String? prioridade,
     String? armazem,
+    String? localConsumoComponentes,
+    String? localEntradaAcabado,
+    List<String>? roteamentoAvisos,
     ProductionStage? stage,
-    List<(String, int)>? materiais,
+    List<(String, num)>? materiais,
     List<MaterialOpDetalhe>? materiaisDetalhados,
     List<ResumoPausaOp>? pausas,
     String? tempoTotal,
@@ -169,6 +178,10 @@ class OrdemProducao {
       atrasada: atrasada ?? this.atrasada,
       prioridade: prioridade ?? this.prioridade,
       armazem: armazem ?? this.armazem,
+      localConsumoComponentes:
+          localConsumoComponentes ?? this.localConsumoComponentes,
+      localEntradaAcabado: localEntradaAcabado ?? this.localEntradaAcabado,
+      roteamentoAvisos: roteamentoAvisos ?? this.roteamentoAvisos,
       stage: stage ?? this.stage,
       materiais: materiais ?? this.materiais,
       materiaisDetalhados: materiaisDetalhados ?? this.materiaisDetalhados,
@@ -213,8 +226,8 @@ class MaterialOpDetalhe {
 
   final String codigo;
   final String descricao;
-  final int quantidadePorUnidade;
-  final int quantidadeTotal;
+  final num quantidadePorUnidade;
+  final num quantidadeTotal;
   final String filial;
   final String armazem;
   final bool movimentaEstoque;
@@ -246,7 +259,8 @@ class OrdemArmazenada {
   final String numero;
   final String produto;
   final int quantidadeOriginal;
-  final int quantidadeArmazenada;
+  final num quantidadeArmazenada;
+  final String unidade;
   final String responsavel;
   final String data;
 
@@ -255,13 +269,15 @@ class OrdemArmazenada {
     required this.produto,
     required this.quantidadeOriginal,
     required this.quantidadeArmazenada,
+    this.unidade = 'un',
     required this.responsavel,
     required this.data,
   });
 
-  String get qtdOriginalLabel => '$quantidadeOriginal un';
+  String get qtdOriginalLabel => '$quantidadeOriginal $unidade';
 
-  String get qtdArmazenadaLabel => '$quantidadeArmazenada un';
+  String get qtdArmazenadaLabel =>
+      '${formatProductionQuantity(quantidadeArmazenada).replaceAll('.', ',')} $unidade';
 
   String get tipoLabel => quantidadeArmazenada >= quantidadeOriginal
       ? 'Armazenada total'

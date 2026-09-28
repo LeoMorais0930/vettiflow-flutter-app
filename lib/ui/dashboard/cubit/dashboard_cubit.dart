@@ -224,8 +224,7 @@ class DashboardCubit extends Cubit<DashboardState> {
     emit(
       state.copyWith(
         databaseSyncing: true,
-        databaseSyncMessage:
-            'Criando OP e movimentando empenhos no Protheus e VettiFlow.',
+        databaseSyncMessage: 'Criando OP e pedidos de materiais no VettiFlow.',
       ),
     );
     try {

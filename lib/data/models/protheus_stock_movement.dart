@@ -1,4 +1,5 @@
 import 'package:vetti_flow_1_0/data/models/production_flow.dart';
+import 'package:vetti_flow_1_0/shared/models/finished_goods_routing.dart';
 
 class ProtheusProductionOrder {
   const ProtheusProductionOrder({
@@ -409,11 +410,26 @@ class ProtheusProductionCompletionPlan {
     final producedQuantity = order.closedQuantity > 0
         ? order.closedQuantity
         : order.quantity;
+    final routing = FinishedGoodsRouting.suggest(
+      productCode: order.productCode,
+      orderWarehouse: order.orderWarehouse,
+      componentWarehouses: catalogItem.components.map((component) {
+        return component.armazem;
+      }),
+    );
+    if (!routing.canComplete) {
+      throw StateError(
+        routing.warnings.isEmpty
+            ? 'Destino do acabado incerto.'
+            : routing.warnings.first,
+      );
+    }
     return ProtheusProductionCompletionPlan(
       finishedProduct: ProtheusFinishedProductMovement.fromOrder(
         order: order,
         unit: catalogItem.unit,
         producedQuantity: producedQuantity,
+        finishedGoodsWarehouse: routing.finishedGoodsWarehouse,
         operatorName: operatorName,
         operatorPin: operatorPin,
       ),
@@ -464,6 +480,7 @@ class ProtheusFinishedProductMovement {
     required ProductionOrderFlow order,
     required String unit,
     required int producedQuantity,
+    required String finishedGoodsWarehouse,
     required String operatorName,
     required String operatorPin,
   }) {
@@ -471,9 +488,7 @@ class ProtheusFinishedProductMovement {
       orderNumber: order.number,
       productCode: order.productCode,
       filial: '04',
-      warehouse: order.orderWarehouse.trim().isEmpty
-          ? '05'
-          : order.orderWarehouse.trim(),
+      warehouse: finishedGoodsWarehouse,
       quantity: producedQuantity,
       unit: unit.trim().isEmpty ? 'PC' : unit.trim(),
       emissionDate: ProtheusStockMovement._yyyymmdd(order.updatedAt),

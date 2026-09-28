@@ -7,6 +7,7 @@ import 'package:vetti_flow_1_0/shared/layout/app_breakpoints.dart';
 import 'package:vetti_flow_1_0/shared/models/operator.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
 import 'package:vetti_flow_1_0/ui/shared/widgets/vetti_top_bar.dart';
+export 'warehouse_read_page.dart' show WarehousePage;
 
 class WarehouseItem {
   const WarehouseItem({
@@ -44,14 +45,14 @@ class WarehouseRequest {
   final List<WarehouseItem> items;
 }
 
-class WarehousePage extends StatefulWidget {
-  const WarehousePage({super.key});
+class WarehousePickingPage extends StatefulWidget {
+  const WarehousePickingPage({super.key});
 
   @override
-  State<WarehousePage> createState() => _WarehousePageState();
+  State<WarehousePickingPage> createState() => _WarehousePageState();
 }
 
-class _WarehousePageState extends State<WarehousePage> {
+class _WarehousePageState extends State<WarehousePickingPage> {
   var _selectedIndex = 0;
   static const _showCreate = false;
 

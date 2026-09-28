@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:vetti_flow_1_0/data/repositories/protheus_connection_store.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
 
 class LoginFormPanel extends StatefulWidget {
@@ -131,8 +129,6 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
                   setState(() => _keepConnected = value ?? false);
                 },
               ),
-              const SizedBox(height: 14),
-              const _DeveloperConnectionPanel(),
               if (widget.loginError != null) ...[
                 const SizedBox(height: 14),
                 Container(
@@ -233,94 +229,6 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Color(0xFFD45B5B), width: 1.5),
       ),
-    );
-  }
-}
-
-class _DeveloperConnectionPanel extends StatelessWidget {
-  const _DeveloperConnectionPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<ProtheusConnectionStore>(
-      builder: (context, store, _) {
-        return Material(
-          color: const Color(0xFFF8FBFD),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Color(0xFFD8E6EE)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              dividerColor: Colors.transparent,
-              splashColor: AppColors.primary.withValues(alpha: 0.08),
-            ),
-            child: ExpansionTile(
-              tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-              childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              leading: const Icon(
-                Icons.tune_rounded,
-                size: 18,
-                color: AppColors.primary,
-              ),
-              title: const Text(
-                'Modo desenvolvedor',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              subtitle: Text(
-                store.mode.description,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.smallText,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final mode in ProtheusConnectionMode.values)
-                        ChoiceChip(
-                          label: Text(mode.label),
-                          selected: store.mode == mode,
-                          onSelected: (_) => store.setMode(mode),
-                          selectedColor: AppColors.primary.withValues(
-                            alpha: 0.14,
-                          ),
-                          side: BorderSide(
-                            color: store.mode == mode
-                                ? AppColors.primary
-                                : const Color(0xFFD8E6EE),
-                          ),
-                          labelStyle: TextStyle(
-                            color: store.mode == mode
-                                ? AppColors.primary
-                                : AppColors.label,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

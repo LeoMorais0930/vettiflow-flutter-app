@@ -238,19 +238,20 @@ class ProtheusProductComponent {
   ProductionComponent toProductionComponent() {
     return ProductionComponent(
       code: code,
+      unit: unit,
       description: description,
-      quantity: quantityPerUnit.round(),
-      stock: stockAvailable.round(),
+      quantity: quantityPerUnit,
+      stock: stockAvailable,
       filial: filial,
       armazem: armazem,
-      currentStock: currentStock.round(),
-      committedQuantity: committedQuantity.round(),
-      reservedQuantity: reservedQuantity.round(),
+      currentStock: currentStock,
+      committedQuantity: committedQuantity,
+      reservedQuantity: reservedQuantity,
       requirementSource: requirementSource,
       sourceOrder: sourceOrder,
       commitmentDate: commitmentDate,
-      originalQuantity: originalQuantity.round(),
-      commitmentQuantity: commitmentQuantity.round(),
+      originalQuantity: originalQuantity,
+      commitmentQuantity: commitmentQuantity,
       structureSequence: structureSequence,
     );
   }

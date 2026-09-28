@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/data/models/pending_mutation.dart';
-import 'package:vetti_flow_1_0/data/repositories/mutation_sync_service.dart';
 import 'package:vetti_flow_1_0/data/repositories/pending_mutation_store.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
+import 'package:vetti_flow_1_0/ui/protheus/protheus_dismantlings_page.dart';
+import 'package:vetti_flow_1_0/ui/protheus/protheus_environment_badge.dart';
+import 'package:vetti_flow_1_0/ui/protheus/protheus_inventory_audit_page.dart';
+import 'package:vetti_flow_1_0/ui/protheus/protheus_write_readiness_page.dart';
 
 class FilaProtheusPage extends StatelessWidget {
   const FilaProtheusPage({super.key});
@@ -14,7 +17,6 @@ class FilaProtheusPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fila = context.watch<PendingMutationStore>();
-    final sync = context.watch<MutationSyncService>();
     final pendentes = fila.pending;
     final armazenadas = fila.stored;
     final aplicadas = fila.sent;
@@ -27,6 +29,26 @@ class FilaProtheusPage extends StatelessWidget {
         foregroundColor: AppColors.text,
         elevation: 0,
         actions: [
+          IconButton(
+            tooltip: 'Desmontagens Protheus',
+            icon: const Icon(Icons.call_split_rounded),
+            onPressed: () =>
+                Navigator.of(context).pushNamed(ProtheusDismantlingsPage.rota),
+          ),
+          IconButton(
+            tooltip: 'Auditoria de estoque Protheus',
+            icon: const Icon(Icons.manage_search_rounded),
+            onPressed: () => Navigator.of(
+              context,
+            ).pushNamed(ProtheusInventoryAuditPage.rota),
+          ),
+          IconButton(
+            tooltip: 'Governanca Protheus',
+            icon: const Icon(Icons.lock_outline_rounded),
+            onPressed: () => Navigator.of(
+              context,
+            ).pushNamed(ProtheusWriteReadinessPage.rota),
+          ),
           if (aplicadas.isNotEmpty)
             TextButton.icon(
               onPressed: fila.clearSent,
@@ -43,16 +65,6 @@ class FilaProtheusPage extends StatelessWidget {
               pendentes: pendentes.length,
               armazenadas: armazenadas.length,
               aplicadas: aplicadas.length,
-              sincronizando: sync.isSyncing,
-              finalizando: sync.isFinalizing,
-              erro: sync.lastError,
-              ultimoEnvio: sync.lastSyncAt,
-              onSincronizar: pendentes.isEmpty || sync.isSyncing
-                  ? null
-                  : () => _sincronizar(context, sync),
-              onFinalizar: armazenadas.isEmpty || sync.isFinalizing
-                  ? null
-                  : () => _finalizar(context, sync, armazenadas),
             ),
             Expanded(
               child: fila.all.isEmpty
@@ -61,7 +73,9 @@ class FilaProtheusPage extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                       children: [
                         if (pendentes.isNotEmpty) ...[
-                          const _SecaoFila('Aguardando envio para a API'),
+                          const _SecaoFila(
+                            'Rascunhos locais sem envio ao Protheus',
+                          ),
                           for (final mutacao in pendentes)
                             _CartaoMutacao(
                               mutacao: mutacao,
@@ -69,12 +83,12 @@ class FilaProtheusPage extends StatelessWidget {
                             ),
                         ],
                         if (armazenadas.isNotEmpty) ...[
-                          const _SecaoFila('Na API, aguardando aplicar'),
+                          const _SecaoFila('Historico local armazenado'),
                           for (final mutacao in armazenadas)
                             _CartaoMutacao(mutacao: mutacao),
                         ],
                         if (aplicadas.isNotEmpty) ...[
-                          const _SecaoFila('Aplicado no Protheus'),
+                          const _SecaoFila('Historico local finalizado'),
                           for (final mutacao in aplicadas)
                             _CartaoMutacao(mutacao: mutacao),
                         ],
@@ -86,75 +100,6 @@ class FilaProtheusPage extends StatelessWidget {
       ),
     );
   }
-
-  Future<void> _sincronizar(
-    BuildContext context,
-    MutationSyncService sync,
-  ) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final aceitas = await sync.sync();
-    final erro = sync.lastError;
-
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          erro != null
-              ? 'Nao deu para falar com a API: $erro. Nada foi perdido.'
-              : aceitas == 0
-              ? 'A API nao aceitou nenhuma linha. Veja o motivo na fila.'
-              : '$aceitas linha${aceitas == 1 ? '' : 's'} enviada${aceitas == 1 ? '' : 's'} para a API.',
-        ),
-      ),
-    );
-  }
-
-  Future<void> _finalizar(
-    BuildContext context,
-    MutationSyncService sync,
-    List<PendingMutation> armazenadas,
-  ) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final confirmou = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Aplicar no Protheus'),
-        content: Text(
-          'Aplicar ${armazenadas.length} linha${armazenadas.length == 1 ? '' : 's'} '
-          'no Protheus agora?\n\nIsso grava de verdade no ERP.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Voltar'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.check_circle_rounded, size: 18),
-            label: const Text('Aplicar'),
-          ),
-        ],
-      ),
-    );
-    if (confirmou != true) return;
-
-    final ids = armazenadas
-        .map((mutacao) => mutacao.id)
-        .toList(growable: false);
-    final aplicadas = await sync.finalizar(ids);
-    final erro = sync.lastError;
-
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          erro != null
-              ? 'Nao deu para falar com a API: $erro.'
-              : aplicadas == 0
-              ? 'Nenhuma linha foi aplicada. Veja o motivo na fila.'
-              : '$aplicadas linha${aplicadas == 1 ? '' : 's'} aplicada${aplicadas == 1 ? '' : 's'} no Protheus.',
-        ),
-      ),
-    );
-  }
 }
 
 class _ResumoFila extends StatelessWidget {
@@ -162,23 +107,11 @@ class _ResumoFila extends StatelessWidget {
     required this.pendentes,
     required this.armazenadas,
     required this.aplicadas,
-    required this.sincronizando,
-    required this.finalizando,
-    required this.erro,
-    required this.ultimoEnvio,
-    required this.onSincronizar,
-    required this.onFinalizar,
   });
 
   final int pendentes;
   final int armazenadas;
   final int aplicadas;
-  final bool sincronizando;
-  final bool finalizando;
-  final String? erro;
-  final DateTime? ultimoEnvio;
-  final VoidCallback? onSincronizar;
-  final VoidCallback? onFinalizar;
 
   @override
   Widget build(BuildContext context) {
@@ -206,10 +139,9 @@ class _ResumoFila extends StatelessWidget {
                   pendentes: pendentes,
                   armazenadas: armazenadas,
                   aplicadas: aplicadas,
-                  ultimoEnvio: ultimoEnvio,
                 ),
                 const SizedBox(height: 14),
-                Wrap(spacing: 8, runSpacing: 8, children: _actions),
+                const ProtheusEnvironmentBadge(),
               ] else
                 Row(
                   children: [
@@ -219,56 +151,20 @@ class _ResumoFila extends StatelessWidget {
                         pendentes: pendentes,
                         armazenadas: armazenadas,
                         aplicadas: aplicadas,
-                        ultimoEnvio: ultimoEnvio,
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      alignment: WrapAlignment.end,
-                      children: _actions,
-                    ),
+                    const ProtheusEnvironmentBadge(),
                   ],
                 ),
-              if (erro != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.dangerBg,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'API indisponivel: $erro\nA fila continua intacta.',
-                    style: TextStyle(fontSize: 12, color: AppColors.danger),
-                  ),
-                ),
-              ],
+              const SizedBox(height: 12),
+              const _ReadOnlyNotice(),
             ],
           ),
         );
       },
     );
   }
-
-  List<Widget> get _actions => [
-    _ActionButton(
-      label: sincronizando ? 'Enviando' : 'Enviar API',
-      icon: Icons.cloud_upload_rounded,
-      busy: sincronizando,
-      onPressed: onSincronizar,
-      color: AppColors.primary,
-    ),
-    _ActionButton(
-      label: finalizando ? 'Aplicando' : 'Aplicar ERP',
-      icon: Icons.check_circle_rounded,
-      busy: finalizando,
-      onPressed: onFinalizar,
-      color: AppColors.green,
-    ),
-  ];
 }
 
 class _ResumoTexto extends StatelessWidget {
@@ -277,14 +173,12 @@ class _ResumoTexto extends StatelessWidget {
     required this.pendentes,
     required this.armazenadas,
     required this.aplicadas,
-    required this.ultimoEnvio,
   });
 
   final int totalAberto;
   final int pendentes;
   final int armazenadas;
   final int aplicadas;
-  final DateTime? ultimoEnvio;
 
   @override
   Widget build(BuildContext context) {
@@ -292,13 +186,7 @@ class _ResumoTexto extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          totalAberto == 0
-              ? 'Nada represado'
-              : pendentes > 0 && armazenadas > 0
-              ? '$pendentes para enviar, $armazenadas aguardando aplicar'
-              : pendentes > 0
-              ? '$pendentes aguardando envio'
-              : '$armazenadas aguardando aplicar',
+          'Modo somente leitura',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.ibmPlexSans(
@@ -309,9 +197,7 @@ class _ResumoTexto extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          ultimoEnvio == null
-              ? 'Nenhuma sincronizacao nesta sessao.'
-              : 'Ultima acao as ${_hora(ultimoEnvio!)}. $aplicadas aplicada${aplicadas == 1 ? '' : 's'}.',
+          _detailText,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 12, color: AppColors.muted),
@@ -320,51 +206,39 @@ class _ResumoTexto extends StatelessWidget {
     );
   }
 
-  String _hora(DateTime date) =>
-      '${date.hour.toString().padLeft(2, '0')}:'
-      '${date.minute.toString().padLeft(2, '0')}';
+  String get _detailText {
+    final parts = <String>[
+      if (pendentes > 0)
+        '$pendentes rascunho${pendentes == 1 ? '' : 's'} local${pendentes == 1 ? '' : 'is'}',
+      if (armazenadas > 0)
+        '$armazenadas registro${armazenadas == 1 ? '' : 's'} local${armazenadas == 1 ? '' : 'is'}',
+      if (aplicadas > 0)
+        '$aplicadas historico${aplicadas == 1 ? '' : 's'} finalizado${aplicadas == 1 ? '' : 's'}',
+    ];
+    final prefix = parts.isEmpty ? '' : '${parts.join('; ')}. ';
+    return '${prefix}O VettiFlow consulta o Protheus, mas nao envia, aplica ou altera dados no ERP.';
+  }
 }
 
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.label,
-    required this.icon,
-    required this.busy,
-    required this.onPressed,
-    required this.color,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool busy;
-  final VoidCallback? onPressed;
-  final Color color;
+class _ReadOnlyNotice extends StatelessWidget {
+  const _ReadOnlyNotice();
 
   @override
   Widget build(BuildContext context) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: busy
-          ? const SizedBox(
-              width: 15,
-              height: 15,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          : Icon(icon, size: 18),
-      label: Text(label, overflow: TextOverflow.ellipsis),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        disabledBackgroundColor: AppColors.buttonSoft,
-        disabledForegroundColor: Colors.white,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        textStyle: GoogleFonts.ibmPlexSans(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE7F6EC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFBFE8CC)),
+      ),
+      child: Text(
+        'Modo somente leitura: esta tela nao possui envio nem aplicacao no Protheus.',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: AppColors.green,
         ),
       ),
     );
@@ -573,7 +447,7 @@ class _FilaVazia extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Pedidos de OP, empenhos, transferencias e baixas aparecem aqui quando forem enviados pela API.',
+              'O Protheus esta em modo somente leitura; movimentos aparecem aqui apenas como rascunho local quando existirem.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: AppColors.smallText),
             ),

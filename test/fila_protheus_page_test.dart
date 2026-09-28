@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/data/models/pending_mutation.dart';
-import 'package:vetti_flow_1_0/data/repositories/mutation_sync_service.dart';
 import 'package:vetti_flow_1_0/data/repositories/pending_mutation_store.dart';
 import 'package:vetti_flow_1_0/data/repositories/protheus_sync_client.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_theme.dart';
@@ -14,16 +17,14 @@ void main() {
     tester,
   ) async {
     final store = PendingMutationStore();
-    final client = ProtheusSyncClient(baseUrl: 'http://localhost:8000');
+    final client = _healthClient();
     addTearDown(client.dispose);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider<PendingMutationStore>.value(value: store),
-          ChangeNotifierProvider<MutationSyncService>(
-            create: (_) => MutationSyncService(store: store, client: client),
-          ),
+          Provider<ProtheusSyncClient>.value(value: client),
         ],
         child: MaterialApp(
           theme: AppTheme.light,
@@ -32,16 +33,25 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('Fila do Protheus'), findsOneWidget);
-    expect(find.text('Nada represado'), findsOneWidget);
+    expect(find.text('Modo somente leitura'), findsWidgets);
+    expect(find.textContaining('HMLp12'), findsWidgets);
     expect(find.text('Nada pendente para o Protheus.'), findsOneWidget);
+    expect(find.text('Enviar API'), findsNothing);
+    expect(find.text('Aplicar ERP'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('top bar shows the Protheus queue shortcut and pending count', (
     tester,
   ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1366, 768);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     final store = PendingMutationStore();
     store.enqueue(
       (id, criadoEm) => AberturaOpMutation(
@@ -55,16 +65,14 @@ void main() {
         localProducao: '05',
       ),
     );
-    final client = ProtheusSyncClient(baseUrl: 'http://localhost:8000');
+    final client = _healthClient();
     addTearDown(client.dispose);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider<PendingMutationStore>.value(value: store),
-          ChangeNotifierProvider<MutationSyncService>(
-            create: (_) => MutationSyncService(store: store, client: client),
-          ),
+          Provider<ProtheusSyncClient>.value(value: client),
         ],
         child: MaterialApp(
           theme: AppTheme.light,
@@ -79,16 +87,36 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
-    expect(find.byTooltip('1 aguardando envio ao Protheus'), findsOneWidget);
+    expect(find.byTooltip('1 rascunho local sem envio'), findsOneWidget);
     expect(find.text('1'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('1 aguardando envio ao Protheus'));
+    await tester.tap(find.byTooltip('1 rascunho local sem envio'));
     await tester.pumpAndSettle();
 
     expect(find.text('Fila do Protheus'), findsOneWidget);
-    expect(find.text('Aguardando envio para a API'), findsOneWidget);
+    expect(find.text('Rascunhos locais sem envio ao Protheus'), findsOneWidget);
     expect(find.textContaining('Abrir OP - 730-0863'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+}
+
+ProtheusSyncClient _healthClient() {
+  return ProtheusSyncClient(
+    baseUrl: 'http://api.local',
+    httpClient: MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'ok': true,
+          'banco': 'HMLp12',
+          'aplicando': false,
+          'readOnly': true,
+          'empresa': '010',
+        }),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    }),
+  );
 }

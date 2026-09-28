@@ -113,7 +113,8 @@ void _avisarProtheusForaDoAr(BuildContext context, String aviso) {
         action: SnackBarAction(
           label: 'Ver fila',
           textColor: Colors.white,
-          onPressed: () => Navigator.of(context).pushNamed(FilaProtheusPage.rota),
+          onPressed: () =>
+              Navigator.of(context).pushNamed(FilaProtheusPage.rota),
         ),
       ),
     );

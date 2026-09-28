@@ -24,8 +24,8 @@ class ProtheusQueueButton extends StatelessWidget {
 
     return IconButton(
       tooltip: aguardando == 0
-          ? 'Fila do Protheus'
-          : '$aguardando aguardando envio ao Protheus',
+          ? 'Protheus somente leitura'
+          : '$aguardando rascunho${aguardando == 1 ? '' : 's'} local${aguardando == 1 ? '' : 'is'} sem envio',
       onPressed: () => Navigator.of(context).pushNamed(FilaProtheusPage.rota),
       icon: Badge(
         isLabelVisible: aguardando > 0,

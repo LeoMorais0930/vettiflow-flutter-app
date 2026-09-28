@@ -146,4 +146,5 @@ class Health(BaseModel):
     ok: bool
     banco: str
     aplicando: bool
+    readOnly: bool
     empresa: str

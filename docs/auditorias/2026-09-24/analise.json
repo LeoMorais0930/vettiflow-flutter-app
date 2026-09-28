@@ -1,0 +1,350 @@
+{
+  "transferencias_pareadas_por_sequencia": 2952,
+  "rotas": [
+    {
+      "origem": "01",
+      "destino": "70",
+      "pares": 687
+    },
+    {
+      "origem": "01",
+      "destino": "05",
+      "pares": 593
+    },
+    {
+      "origem": "05",
+      "destino": "06",
+      "pares": 278
+    },
+    {
+      "origem": "01",
+      "destino": "10",
+      "pares": 247
+    },
+    {
+      "origem": "10",
+      "destino": "07",
+      "pares": 199
+    },
+    {
+      "origem": "05",
+      "destino": "10",
+      "pares": 181
+    },
+    {
+      "origem": "01",
+      "destino": "07",
+      "pares": 143
+    },
+    {
+      "origem": "01",
+      "destino": "72",
+      "pares": 138
+    },
+    {
+      "origem": "05",
+      "destino": "07",
+      "pares": 107
+    },
+    {
+      "origem": "70",
+      "destino": "05",
+      "pares": 62
+    },
+    {
+      "origem": "03",
+      "destino": "05",
+      "pares": 55
+    },
+    {
+      "origem": "03",
+      "destino": "70",
+      "pares": 49
+    },
+    {
+      "origem": "03",
+      "destino": "07",
+      "pares": 39
+    },
+    {
+      "origem": "06",
+      "destino": "05",
+      "pares": 30
+    },
+    {
+      "origem": "10",
+      "destino": "06",
+      "pares": 22
+    },
+    {
+      "origem": "70",
+      "destino": "01",
+      "pares": 17
+    },
+    {
+      "origem": "05",
+      "destino": "01",
+      "pares": 14
+    },
+    {
+      "origem": "01",
+      "destino": "03",
+      "pares": 14
+    },
+    {
+      "origem": "70",
+      "destino": "10",
+      "pares": 11
+    },
+    {
+      "origem": "10",
+      "destino": "10",
+      "pares": 8
+    },
+    {
+      "origem": "08",
+      "destino": "05",
+      "pares": 8
+    },
+    {
+      "origem": "06",
+      "destino": "10",
+      "pares": 7
+    },
+    {
+      "origem": "07",
+      "destino": "10",
+      "pares": 6
+    },
+    {
+      "origem": "05",
+      "destino": "03",
+      "pares": 5
+    },
+    {
+      "origem": "72",
+      "destino": "05",
+      "pares": 5
+    },
+    {
+      "origem": "10",
+      "destino": "05",
+      "pares": 5
+    },
+    {
+      "origem": "03",
+      "destino": "72",
+      "pares": 4
+    },
+    {
+      "origem": "07",
+      "destino": "05",
+      "pares": 3
+    },
+    {
+      "origem": "08",
+      "destino": "10",
+      "pares": 2
+    },
+    {
+      "origem": "07",
+      "destino": "06",
+      "pares": 2
+    },
+    {
+      "origem": "10",
+      "destino": "01",
+      "pares": 2
+    },
+    {
+      "origem": "03",
+      "destino": "10",
+      "pares": 2
+    },
+    {
+      "origem": "05",
+      "destino": "05",
+      "pares": 1
+    },
+    {
+      "origem": "05",
+      "destino": "70",
+      "pares": 1
+    },
+    {
+      "origem": "12",
+      "destino": "05",
+      "pares": 1
+    },
+    {
+      "origem": "01",
+      "destino": "01",
+      "pares": 1
+    },
+    {
+      "origem": "07",
+      "destino": "01",
+      "pares": 1
+    },
+    {
+      "origem": "03",
+      "destino": "01",
+      "pares": 1
+    },
+    {
+      "origem": "08",
+      "destino": "01",
+      "pares": 1
+    }
+  ],
+  "mudancas_produto": [
+    {
+      "data": "20260624",
+      "documento": "Q000003XX",
+      "sequencia": "410005",
+      "origem": "05",
+      "destino": "05",
+      "produto_saida": "102-525",
+      "produto_entrada": "102-571",
+      "quantidade_saida": 500.0,
+      "quantidade_entrada": 500.0,
+      "um_saida": "PC",
+      "um_entrada": "PC"
+    },
+    {
+      "data": "20260625",
+      "documento": "Q000003Y3",
+      "sequencia": "410129",
+      "origem": "10",
+      "destino": "10",
+      "produto_saida": "730-0888",
+      "produto_entrada": "575-0888",
+      "quantidade_saida": 9.0,
+      "quantidade_entrada": 9.0,
+      "um_saida": "PC",
+      "um_entrada": "PC"
+    },
+    {
+      "data": "20260708",
+      "documento": "Q00000406",
+      "sequencia": "411635",
+      "origem": "01",
+      "destino": "01",
+      "produto_saida": "103-072",
+      "produto_entrada": "103-071",
+      "quantidade_saida": 3000.0,
+      "quantidade_entrada": 3000.0,
+      "um_saida": "PC",
+      "um_entrada": "PC"
+    },
+    {
+      "data": "20260714",
+      "documento": "Q0000040H",
+      "sequencia": "411885",
+      "origem": "10",
+      "destino": "10",
+      "produto_saida": "575-0802",
+      "produto_entrada": "575-0923",
+      "quantidade_saida": 80.0,
+      "quantidade_entrada": 80.0,
+      "um_saida": "PC",
+      "um_entrada": "UN"
+    },
+    {
+      "data": "20260715",
+      "documento": "Q0000040P",
+      "sequencia": "411913",
+      "origem": "10",
+      "destino": "10",
+      "produto_saida": "730-0773",
+      "produto_entrada": "630-0773",
+      "quantidade_saida": 1.0,
+      "quantidade_entrada": 1.0,
+      "um_saida": "PC",
+      "um_entrada": "PC"
+    },
+    {
+      "data": "20260716",
+      "documento": "Q00000411",
+      "sequencia": "412078",
+      "origem": "10",
+      "destino": "10",
+      "produto_saida": "730-0773",
+      "produto_entrada": "740-0773",
+      "quantidade_saida": 50.0,
+      "quantidade_entrada": 50.0,
+      "um_saida": "PC",
+      "um_entrada": "PC"
+    },
+    {
+      "data": "20260723",
+      "documento": "Q00000438",
+      "sequencia": "413099",
+      "origem": "01",
+      "destino": "10",
+      "produto_saida": "106-010",
+      "produto_entrada": "106-014",
+      "quantidade_saida": 50.0,
+      "quantidade_entrada": 50.0,
+      "um_saida": "PC",
+      "um_entrada": "PC"
+    },
+    {
+      "data": "20260724",
+      "documento": "Q0000043G",
+      "sequencia": "413225",
+      "origem": "10",
+      "destino": "10",
+      "produto_saida": "730-0885",
+      "produto_entrada": "740-0885",
+      "quantidade_saida": 80.0,
+      "quantidade_entrada": 80.0,
+      "um_saida": "PC",
+      "um_entrada": "PC"
+    },
+    {
+      "data": "20260730",
+      "documento": "Q0000044K",
+      "sequencia": "413788",
+      "origem": "10",
+      "destino": "10",
+      "produto_saida": "730-0879",
+      "produto_entrada": "740-0879",
+      "quantidade_saida": 80.0,
+      "quantidade_entrada": 80.0,
+      "um_saida": "PC",
+      "um_entrada": "PC"
+    },
+    {
+      "data": "20260730",
+      "documento": "Q00000452",
+      "sequencia": "413891",
+      "origem": "10",
+      "destino": "10",
+      "produto_saida": "730-0886",
+      "produto_entrada": "740-0886",
+      "quantidade_saida": 100.0,
+      "quantidade_entrada": 100.0,
+      "um_saida": "PC",
+      "um_entrada": "PC"
+    },
+    {
+      "data": "20260827",
+      "documento": "Q000004A1",
+      "sequencia": "416626",
+      "origem": "10",
+      "destino": "10",
+      "produto_saida": "203-055",
+      "produto_entrada": "203-056",
+      "quantidade_saida": 43.0,
+      "quantidade_entrada": 43.0,
+      "um_saida": "PC",
+      "um_entrada": "PC"
+    }
+  ],
+  "resultado_pareamento_atual_app": {
+    "pareada": 2941,
+    "sem_entrada": 11,
+    "sem_saida": 11
+  }
+}

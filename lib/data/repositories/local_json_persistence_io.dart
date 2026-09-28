@@ -3,10 +3,10 @@ import 'dart:io';
 /// Persistencia em arquivo para as plataformas com `dart:io` — Windows, macOS,
 /// Linux e mobile.
 ///
-/// A fila de mutacoes existe justamente para o caso da API estar fora do ar.
-/// Antes disso, no desktop, ela so vivia na memoria: fechar o app perdia tudo
-/// o que estava aguardando envio. Aqui ela vai para o disco a cada mudanca, e
-/// volta sozinha na abertura seguinte — quando a API voltar, e so mandar.
+/// A fila de mutacoes existe para manter rastreaveis os rascunhos locais.
+/// Antes disso, no desktop, ela so vivia na memoria: fechar o app perdia tudo.
+/// Aqui ela vai para o disco a cada mudanca e volta sozinha na abertura
+/// seguinte.
 ///
 /// A escrita passa por um arquivo temporario e um rename. Rename e atomico nos
 /// sistemas que atendemos, entao um desligamento no meio da gravacao deixa o
@@ -75,7 +75,7 @@ class LocalJsonPersistence {
       temporario.renameSync(arquivo.path);
     } on IOException catch (erro) {
       // Falhar aqui nao pode derrubar a operacao que o usuario acabou de
-      // fazer: a mutacao segue valida em memoria e ainda pode ser enviada.
+      // fazer: a mutacao segue valida em memoria.
       stderr.writeln('fila local: falha ao gravar ${arquivo.path}: $erro');
     }
   }

@@ -1,0 +1,231 @@
+{
+  "paula_identity": [
+    {
+      "login": "paulad",
+      "name": "Paula Daniela Soares Moraes"
+    }
+  ],
+  "paula_all_history": [
+    {
+      "warehouse": "03",
+      "cf": "PR0",
+      "tm": "001",
+      "records": 347,
+      "firstDate": "20250121",
+      "latestDate": "20260917"
+    },
+    {
+      "warehouse": "03",
+      "cf": "RE1",
+      "tm": "999",
+      "records": 10519,
+      "firstDate": "20250121",
+      "latestDate": "20260917"
+    },
+    {
+      "warehouse": "10",
+      "cf": "RE1",
+      "tm": "999",
+      "records": 87,
+      "firstDate": "20250123",
+      "latestDate": "20250703"
+    }
+  ],
+  "paula_recent": [
+    {
+      "warehouse": "03",
+      "cf": "PR0",
+      "records": 59,
+      "ops": 37
+    },
+    {
+      "warehouse": "03",
+      "cf": "RE1",
+      "records": 1970,
+      "ops": 37
+    }
+  ],
+  "production_samples": [
+    {
+      "op": "01641301001",
+      "product": "500-0879",
+      "quantity": 4.0,
+      "unit": "PC",
+      "warehouse": "03",
+      "date": "20260918",
+      "document": "016413010",
+      "sequence": "418644",
+      "operator": "TATIANE"
+    },
+    {
+      "op": "01640801001",
+      "product": "500-0759",
+      "quantity": 4200.0,
+      "unit": "PC",
+      "warehouse": "03",
+      "date": "20260917",
+      "document": "016408010",
+      "sequence": "418594",
+      "operator": "paulad"
+    },
+    {
+      "op": "01640901001",
+      "product": "500-0863",
+      "quantity": 1620.0,
+      "unit": "PC",
+      "warehouse": "03",
+      "date": "20260917",
+      "document": "016409010",
+      "sequence": "418590",
+      "operator": "paulad"
+    },
+    {
+      "op": "01637701001",
+      "product": "500-0806",
+      "quantity": 2000.0,
+      "unit": "PC",
+      "warehouse": "03",
+      "date": "20260915",
+      "document": "016377010",
+      "sequence": "418431",
+      "operator": "paulad"
+    },
+    {
+      "op": "01637601001",
+      "product": "500-0879",
+      "quantity": 504.0,
+      "unit": "PC",
+      "warehouse": "03",
+      "date": "20260914",
+      "document": "016376010",
+      "sequence": "418349",
+      "operator": "paulad"
+    }
+  ],
+  "smd_orders": [
+    {
+      "status": "closed",
+      "records": 538,
+      "firstDate": "20230223",
+      "latestDate": "20260918",
+      "partial": 17
+    },
+    {
+      "status": "open",
+      "records": 19,
+      "firstDate": "20250213",
+      "latestDate": "20260918",
+      "partial": 3
+    }
+  ],
+  "smd_months": [
+    {
+      "month": "202606",
+      "cf": "PR0",
+      "unit": "PC",
+      "records": 4,
+      "quantity": 4536.0
+    },
+    {
+      "month": "202607",
+      "cf": "PR0",
+      "unit": "PC",
+      "records": 20,
+      "quantity": 29044.0
+    },
+    {
+      "month": "202608",
+      "cf": "PR0",
+      "unit": "PC",
+      "records": 33,
+      "quantity": 22304.0
+    },
+    {
+      "month": "202609",
+      "cf": "PR0",
+      "unit": "PC",
+      "records": 9,
+      "quantity": 14051.0
+    }
+  ],
+  "requisition_parameter": [
+    {
+      "X6_FIL": "04",
+      "X6_VAR": "MV_PRODAUT",
+      "X6_CONTEUD": "T"
+    },
+    {
+      "X6_FIL": "04",
+      "X6_VAR": "MV_REQAUT",
+      "X6_CONTEUD": "A"
+    }
+  ],
+  "full_login_recheck": {
+    "database": "HMLp12",
+    "login": "paulad",
+    "date": "2026-09-24",
+    "scope": "SD3010 e SD3900, sem filtro de filial, local, data ou exclusao; SD3010_TTAT_LOG para auditoria",
+    "sd3010": [
+      {
+        "filial": "04",
+        "warehouse": "03",
+        "cf": "PR0",
+        "tm": "001",
+        "reversed": false,
+        "deleted": false,
+        "records": 346
+      },
+      {
+        "filial": "04",
+        "warehouse": "03",
+        "cf": "PR0",
+        "tm": "001",
+        "reversed": true,
+        "deleted": false,
+        "records": 1
+      },
+      {
+        "filial": "04",
+        "warehouse": "03",
+        "cf": "RE1",
+        "tm": "999",
+        "reversed": false,
+        "deleted": false,
+        "records": 10491
+      },
+      {
+        "filial": "04",
+        "warehouse": "03",
+        "cf": "RE1",
+        "tm": "999",
+        "reversed": true,
+        "deleted": false,
+        "records": 28
+      },
+      {
+        "filial": "04",
+        "warehouse": "10",
+        "cf": "RE1",
+        "tm": "999",
+        "reversed": false,
+        "deleted": false,
+        "records": 87
+      }
+    ],
+    "sd3900_records": 0,
+    "consumption_records": 10606,
+    "consumption_matching_posting_same_branch_op_document_date_login": 10606,
+    "reversed_posting": {
+      "op": "01471801001",
+      "date": "20260309",
+      "product": "500-0945",
+      "quantity": 200,
+      "warehouse": "03"
+    },
+    "audit_log_approx_total_rows": 812,
+    "audit_rows_matching_login_or_user_id": 0,
+    "audit_rows_for_reversal_of_linked_sd3_records": 0,
+    "reversal_actor": "nao identificado no log disponivel",
+    "limits": "Historico de movimentos internos; nao certifica permissoes, autor do estorno, criacao de OP ou todas as atividades em outros modulos."
+  }
+}

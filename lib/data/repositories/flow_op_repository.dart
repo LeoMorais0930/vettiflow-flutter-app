@@ -7,6 +7,7 @@ import 'package:vetti_flow_1_0/data/repositories/production_flow_store.dart';
 import 'package:vetti_flow_1_0/data/repositories/protheus_order_publisher.dart';
 import 'package:vetti_flow_1_0/data/repositories/protheus_product_repository.dart';
 import 'package:vetti_flow_1_0/data/repositories/warehouse_request_store.dart';
+import 'package:vetti_flow_1_0/shared/models/finished_goods_routing.dart';
 import 'package:vetti_flow_1_0/shared/models/operator.dart';
 import 'package:vetti_flow_1_0/shared/models/warehouse_routing.dart';
 
@@ -51,14 +52,15 @@ class FlowOpRepository implements OpRepository {
 
   @override
   Future<List<OrdemArmazenada>> fetchOrdensArmazenadas() async {
-    return _store
-        .ordersAtStage(ProductionStage.storage)
+    return _store.orders
+        .where((order) => order.totalStoredQuantity > 0)
         .map(
           (order) => OrdemArmazenada(
             numero: order.number,
             produto: order.productLabel,
             quantidadeOriginal: order.quantity,
-            quantidadeArmazenada: order.storedQuantity,
+            quantidadeArmazenada: order.totalStoredQuantity,
+            unidade: order.unit.isEmpty ? 'un' : order.unit,
             responsavel: _responsavel(order),
             data: _fmtDate(order.updatedAt),
           ),
@@ -139,6 +141,7 @@ class FlowOpRepository implements OpRepository {
       prazo: dto.prazo,
       orderWarehouse: dto.armazem,
       initialStage: _initialStageForWarehouse(dto.armazem),
+      plannedStages: dto.plannedStages,
       operatorPin: dto.operatorPin,
     );
     warehouseRequests?.createForOrder(
@@ -228,6 +231,14 @@ class FlowOpRepository implements OpRepository {
   OrdemProducao _toOrdem(ProductionOrderFlow order) {
     final status = _statusFrom(order);
     final finalizada = status == StatusOP.finalizada;
+    final catalogItem = _store.catalogItem(order.productCode);
+    final routing = FinishedGoodsRouting.suggest(
+      productCode: order.productCode,
+      orderWarehouse: order.orderWarehouse,
+      componentWarehouses: catalogItem.components.map((component) {
+        return component.armazem;
+      }),
+    );
     return OrdemProducao(
       numero: order.number,
       produto: order.productLabel,
@@ -242,14 +253,19 @@ class FlowOpRepository implements OpRepository {
       prioridade: order.priority,
       stage: order.currentStage,
       armazem: order.orderWarehouse,
-      materiais: _store
-          .catalogItem(order.productCode)
-          .components
+      localConsumoComponentes: order.componentConsumptionWarehouse.isNotEmpty
+          ? order.componentConsumptionWarehouse
+          : routing.componentConsumptionWarehouse,
+      localEntradaAcabado: order.finishedGoodsWarehouse.isNotEmpty
+          ? order.finishedGoodsWarehouse
+          : routing.finishedGoodsWarehouse,
+      roteamentoAvisos: order.routingWarnings.isNotEmpty
+          ? order.routingWarnings
+          : routing.warnings,
+      materiais: catalogItem.components
           .map((c) => (c.description, c.quantity))
           .toList(),
-      materiaisDetalhados: _store
-          .catalogItem(order.productCode)
-          .components
+      materiaisDetalhados: catalogItem.components
           .map(
             (component) => MaterialOpDetalhe(
               codigo: component.code,

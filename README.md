@@ -1,66 +1,54 @@
-# VettiFlow 1.0 - PROJETO FIXO ATUAL
+# VettiFlow 1.0
 
-Projeto Flutter/Dart fixo em uso para as telas do VettiFlow.
+Aplicativo Flutter para acompanhar os setores da Vetti e consultar o Protheus DEV.
+A integração com o ERP é somente leitura. As operações locais do app continuam separadas dos documentos oficiais.
 
-Workspace atual:
+## Documentação
 
-```text
-C:\Users\Leonardo Morais\Desktop\VettiFlow\vetti flow 1.0 flutter dart
-```
+Comece pelo [índice por setor](docs/README.md). O [guia de arquitetura](docs/desenvolvimento/arquitetura.md) explica o que está integrado e o que falta.
 
-Atalho recomendado para abrir nos projetos recentes:
+## Executar localmente no Windows
 
-```text
-C:\Users\Leonardo Morais\Desktop\VettiFlow\VettiFlow - FIXO ATUAL
-```
+Pré-requisitos: Flutter no PATH, Python, driver ODBC para SQL Server e acesso à rede do DEV.
+Configure `api/.env` conforme [a documentação da API](api/README.md), sem substituir um arquivo já preenchido.
 
-## Rodar localmente
+Na raiz, prepare dependências quando necessário:
 
 ```powershell
 flutter pub get
-flutter run -d web-server --web-hostname 127.0.0.1 --web-port 5174
+python -m venv api/venv
+.\api\venv\Scripts\python.exe -m pip install -r api/requirements.txt
 ```
 
-Abra:
+Terminal 1, na raiz:
 
-```text
-http://127.0.0.1:5174
+```powershell
+.\api\venv\Scripts\python.exe -m uvicorn app.main:app --app-dir api --host 127.0.0.1 --port 8000
 ```
 
-## Estrutura inicial
+Terminal 2, na raiz:
 
-```text
-lib/
-  app/
-    vetti_flow_app.dart
-  ui/
-    auth/
-      login_page.dart
-      widgets/
-        login_brand_panel.dart
-        login_form_panel.dart
-    firmware/
-      firmware_page.dart
-      widgets/
-        firmware_completion_dialogs.dart
-        firmware_models.dart
-        operation_actions.dart
-        operation_card.dart
-        operation_metrics.dart
-    shared/
-      widgets/
-        vetti_top_bar.dart
-  shared/
-    theme/
-      app_colors.dart
-      app_theme.dart
+```powershell
+.\api\venv\Scripts\python.exe scripts/preparar_web_local.py
+flutter run -d web-server --web-hostname 127.0.0.1 --web-port 5174 --dart-define-from-file=.dart_tool/vettiflow-local-defines.json
 ```
 
-## Base pronta
+Abra [VettiFlow](http://127.0.0.1:5174). O script reutiliza o token local da API sem imprimi-lo. O arquivo gerado fica em `.dart_tool`, ignorada pelo Git.
+Use Ctrl+C nos terminais para encerrar. Se as portas já estiverem ocupadas por uma instância do app, encerre essa instância antes de iniciar outra.
 
-- App Flutter criado com o package `vetti_flow_1_0`.
-- Login inicial responsivo para desktop e mobile, seguindo a tela de referencia do VettiFlow.
-- Tela de gravacao de firmware responsiva, com fluxo de defeitos e assinatura por PIN.
-- Tema central com a cor Vetti `#0077BD`.
-- Logo VettiFlow em `assets/images/vetti-flow-logo.png`.
-- Tela preparada para trocar o `SnackBar` por chamada real de backend depois.
+## Organização
+
+- `lib/`: telas, modelos e repositórios Flutter.
+- `api/`: FastAPI e consultas ao SQL Server DEV.
+- `test/` e `api/tests/`: testes.
+- `docs/setores/`: funcionamento e pendências por setor.
+- `docs/desenvolvimento/`: arquitetura e padrão visual.
+- `docs/auditorias/`, `docs/pesquisa_protheus_2026-09-24/` e `docs/testing/`: evidências preservadas.
+
+## Verificar alterações
+
+```powershell
+flutter analyze --no-pub
+flutter test --no-pub
+.\api\venv\Scripts\python.exe -m pytest api/tests -q
+```

@@ -29,6 +29,15 @@ enum WorkArea {
   final String label;
 }
 
+enum OperatorPermission {
+  operation('Somente operação'),
+  consultation('Operação e consultas'),
+  manager('Gestor do setor');
+
+  const OperatorPermission(this.label);
+  final String label;
+}
+
 class Operator {
   const Operator({
     required this.name,
@@ -38,10 +47,13 @@ class Operator {
     required this.stage,
     this.role = 'Operador',
     this.usesAssignedStage = false,
-    this.canManageAssignments = false,
+    bool canManageAssignments = false,
+    this.permission,
     this.area = WorkArea.production,
     this.managesArea,
-  });
+    // Mantém o nome público do parâmetro usado pelo cadastro existente.
+    // ignore: prefer_initializing_formals
+  }) : _canManageAssignments = canManageAssignments;
 
   final String name;
   final String username;
@@ -50,11 +62,21 @@ class Operator {
   final WorkStage stage;
   final String role;
   final bool usesAssignedStage;
-  final bool canManageAssignments;
+  final bool _canManageAssignments;
+  final OperatorPermission? permission;
+  bool get canManageAssignments => permission == null
+      ? _canManageAssignments
+      : permission == OperatorPermission.manager;
+  OperatorPermission get effectivePermission =>
+      permission ??
+      (canManageAssignments
+          ? OperatorPermission.manager
+          : OperatorPermission.operation);
   final WorkArea area;
   final WorkArea? managesArea;
 
-  Operator copyWithStage(WorkStage stage) {
+  Operator copyWithStage(WorkStage stage, {OperatorPermission? permission}) {
+    final access = permission ?? this.permission;
     return Operator(
       name: name,
       username: username,
@@ -63,9 +85,15 @@ class Operator {
       stage: stage,
       role: role,
       usesAssignedStage: usesAssignedStage,
-      canManageAssignments: canManageAssignments,
+      canManageAssignments: _canManageAssignments,
+      permission: access,
       area: area,
-      managesArea: managesArea,
+      managesArea:
+          access == OperatorPermission.manager && area != WorkArea.system
+          ? area
+          : access != null && access != OperatorPermission.manager
+          ? null
+          : managesArea,
     );
   }
 

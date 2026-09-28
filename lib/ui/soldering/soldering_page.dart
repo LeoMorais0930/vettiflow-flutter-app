@@ -76,6 +76,18 @@ class SolderingPage extends StatefulWidget {
 
 class _SolderingPageState extends State<SolderingPage> {
   var _selectedIndex = 0;
+  bool _initialSelectionApplied = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialSelectionApplied) return;
+    _initialSelectionApplied = true;
+    final number = ModalRoute.of(context)?.settings.arguments;
+    if (number is! String) return;
+    final index = _flowOrders().indexWhere((order) => order.number == number);
+    if (index >= 0) _selectedIndex = index;
+  }
 
   List<ProductionOrderFlow> _flowOrders() => context
       .read<ProductionFlowStore>()
@@ -100,7 +112,7 @@ class _SolderingPageState extends State<SolderingPage> {
     return SolderingOperation(
       number: order.number,
       product: order.productLabel,
-      quantity: order.quantityLabel,
+      quantity: order.productionQuantityLabel,
       origin: 'Firmware',
       receivedAt: _clockLabel(order.updatedAt),
       receivedAgo: timing?.startedAt == null
@@ -141,7 +153,7 @@ class _SolderingPageState extends State<SolderingPage> {
     final request = await showPauseReasonDialog(
       context,
       stage: ProductionStage.soldering,
-      maxQuantity: order.quantity,
+      maxQuantity: order.productionQuantity.floor(),
     );
     if (!mounted || request == null) return;
     await context.read<ProductionFlowStore>().pauseStage(
@@ -168,7 +180,9 @@ class _SolderingPageState extends State<SolderingPage> {
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${operation.number} enviada para teste.')),
+      SnackBar(
+        content: Text('${operation.number}: sessão concluída no VettiFlow.'),
+      ),
     );
   }
 
@@ -773,10 +787,10 @@ class _DesktopSolderingDetail extends StatelessWidget {
       SolderingStatus.waiting =>
         'Inicie a soldagem para liberar pausa e envio.',
       SolderingStatus.active =>
-        'Soldagem em andamento. Pause ou envie para teste.',
+        'Soldagem em andamento. Pause ou conclua a etapa.',
       SolderingStatus.paused =>
         'OP pausada. Retome a etapa ou envie com assinatura.',
-      SolderingStatus.completed => 'OP enviada para a etapa de teste.',
+      SolderingStatus.completed => 'Etapa concluída.',
     };
   }
 }
@@ -1117,7 +1131,7 @@ class _SolderingActions extends StatelessWidget {
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'OP assinada e enviada para teste.',
+                'Etapa assinada no VettiFlow.',
                 style: TextStyle(
                   color: AppColors.green,
                   fontSize: 13,
@@ -1387,7 +1401,7 @@ class _SolderingPinSheetState extends State<_SolderingPinSheet> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Digite o PIN para enviar a ${widget.operation.number} para teste.',
+            'Digite o PIN para concluir a soldagem da ${widget.operation.number}.',
             style: const TextStyle(color: AppColors.muted, fontSize: 13),
           ),
           const SizedBox(height: 24),

@@ -1,5 +1,7 @@
 # Evidencia TDD - etapa SMD e restricao da Paula
 
+> Registro histórico da demo. Desde 24/09/2026, `/smd` consulta OPs e apontamentos oficiais, sem avanço local para gravação. Consulte [a entrega atual](smd-consulta.tdd.md) e o [guia do SMD](../setores/smd/README.md). As regras abaixo de avanço de etapas descrevem o fluxo local antigo, ainda existente no modelo/painel de gestão.
+
 Data: 2026-08-04
 
 ## Jornada
@@ -19,7 +21,7 @@ Como responsavel pelo SMD, Paula deve apontar OPs no armazem 03 antes de a OP ir
 | 7 | Tatiane visualiza OPs de Almoxarifado/SMD no dashboard, mas nao ve botoes de movimentacao dessas etapas. | `flutter test test\widget_test.dart --plain-name "Tatiane"` | PASS |
 | 8 | Tatiane continua podendo movimentar OPs que ja estao nas etapas de producao. | `flutter test test\widget_test.dart --plain-name "Tatiane"` | PASS |
 | 9 | Login `paula / 1003` abre direto a tela SMD, sem permissao de gestao no dashboard. | `flutter test test\widget_test.dart --plain-name "Paula routes directly to SMD pointing screen"` | PASS |
-| 10 | Armazem escolhido no componente e usado em SB2, SD3 e SD4, inclusive quando diferente do armazem de producao. | `flutter test test\protheus_movements_test.dart` e `dart run tools\check_vettiflow_protheus_movements.dart` | PASS |
+| 10 | Armazem escolhido no componente e usado em SB2, SD3 e SD4, inclusive quando diferente do armazem de producao. | `flutter test test\protheus_movements_test.dart` | PASS |
 | 11 | OP criada no armazem 05 nasce direto em Gravacao, sem passar por Almoxarifado/SMD. | `flutter test test\protheus_lookup_test.dart --plain-name "flow repository blocks OP creation outside operator warehouses"` | PASS |
 
 ## Banco
@@ -31,7 +33,7 @@ ALTER TYPE vettiflow.production_stage ADD VALUE IF NOT EXISTS 'smd' AFTER 'wareh
 ALTER TYPE vettiflow.work_stage ADD VALUE IF NOT EXISTS 'smd' AFTER 'dashboard';
 ```
 
-Conferencia no Postgres local:
+Conferencia legada no banco local:
 
 ```text
 production_stage:warehouse,smd,firmware,soldering,testing,closing,expedition,storage,completed

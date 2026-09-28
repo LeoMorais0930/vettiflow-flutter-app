@@ -316,27 +316,6 @@ void main() {
     await repository.lookupByCode('730-0863');
   });
 
-  test(
-    'API-first repository falls back to local Postgres repository',
-    () async {
-      final repository = ApiFirstProtheusProductRepository(
-        primary: ApiProtheusProductRepository(
-          baseUrl: 'http://api.local',
-          httpClient: MockClient(
-            (_) async => throw const SocketException('offline'),
-          ),
-        ),
-        fallback: const _FakeProtheusProductRepository(),
-      );
-
-      final lookup = await repository.lookupByCode('730-0863');
-      final products = await repository.searchProducts('smart');
-
-      expect(lookup?.product.code, '730-0863');
-      expect(products.map((product) => product.code), contains('730-0863'));
-    },
-  );
-
   test('product lookup exposes components and child OPs for a code', () {
     const lookup = ProtheusProductLookup(
       product: ProtheusProduct(

@@ -3,11 +3,47 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/data/models/warehouse_request.dart';
+import 'package:vetti_flow_1_0/data/models/warehouse_report.dart'
+    show reportNumber;
 import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
 import 'package:vetti_flow_1_0/data/repositories/warehouse_request_store.dart';
 import 'package:vetti_flow_1_0/shared/models/operator.dart';
+import 'package:vetti_flow_1_0/ui/shared/widgets/vetti_top_bar.dart';
 import 'package:vetti_flow_1_0/shared/models/warehouse_routing.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
+
+class CollaboratorsPage extends StatelessWidget {
+  const CollaboratorsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final actor = context.watch<OperatorAssignmentStore>().currentOperator;
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            VettiTopBar(
+              title: 'Colaboradores',
+              operatorName: actor?.name ?? '',
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1440),
+                    child: const OperatorAssignmentsView(),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class OperatorAssignmentsView extends StatefulWidget {
   const OperatorAssignmentsView({super.key});
@@ -21,12 +57,33 @@ class _OperatorAssignmentsViewState extends State<OperatorAssignmentsView> {
   var _selectedUsername =
       OperatorAssignmentStore.assignableOperators.first.username;
 
+  void _assign(
+    OperatorAssignmentStore store,
+    String username,
+    WorkStage stage,
+  ) {
+    try {
+      store.assignStage(username, stage);
+    } catch (_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível salvar a etapa. Tente novamente.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = context.watch<OperatorAssignmentStore>();
     final requestStore = context.watch<WarehouseRequestStore>();
     final operators = store.visibleAssignableOperators;
     final currentOperator = store.currentOperator;
+    if (currentOperator?.canManageAssignments != true) {
+      return const Text(
+        'A gestão de colaboradores está disponível apenas aos gestores.',
+      );
+    }
     if (operators.isEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -77,8 +134,7 @@ class _OperatorAssignmentsViewState extends State<OperatorAssignmentsView> {
                   store: store,
                   onOperatorSelect: (username) =>
                       setState(() => _selectedUsername = username),
-                  onAssign: (stage) =>
-                      store.assignStage(selected.username, stage),
+                  onAssign: (stage) => _assign(store, selected.username, stage),
                 ),
               ],
             ),
@@ -115,7 +171,7 @@ class _OperatorAssignmentsViewState extends State<OperatorAssignmentsView> {
                     operator: selected,
                     selectedStage: selectedStage,
                     onAssign: (stage) =>
-                        store.assignStage(selected.username, stage),
+                        _assign(store, selected.username, stage),
                   ),
                 ),
               ],
@@ -212,7 +268,10 @@ class _WarehouseRequestsPanel extends StatelessWidget {
             for (final request in pending) ...[
               _WarehouseRequestTile(
                 request: request,
-                currentOperator: currentOperator,
+                currentOperator:
+                    requestStore.canHandle(request, currentOperator)
+                    ? currentOperator
+                    : null,
                 onConfirm: () => _confirm(context, request),
                 onReject: () => _showRejectDialog(context, request),
               ),
@@ -226,10 +285,16 @@ class _WarehouseRequestsPanel extends StatelessWidget {
   void _confirm(BuildContext context, WarehouseConfirmationRequest request) {
     final operator = currentOperator;
     if (operator == null) return;
-    requestStore.confirm(request.id, operator);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${request.componentCode} confirmado.')),
-    );
+    try {
+      requestStore.confirm(request.id, operator);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${request.componentCode} confirmado.')),
+      );
+    } on StateError catch (error) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 
   Future<void> _showRejectDialog(
@@ -376,7 +441,7 @@ class _WarehouseRequestTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  '${request.quantity} un · ${request.warehouseLabel} · OP ${request.orderNumber}',
+                  '${reportNumber(request.quantity)} ${request.unit} · ${request.warehouseLabel} · OP ${request.orderNumber}',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 11.5,
@@ -557,7 +622,9 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
   @override
   Widget build(BuildContext context) {
     final requestedWarehouses = _warehousesForArea(widget.area);
-    final orderWarehouses = WarehouseRouting.all.map((item) => item.code);
+    final orderWarehouses = WarehouseRouting.operational.map(
+      (item) => item.code,
+    );
 
     return AlertDialog(
       title: const Text('Fazer requisicao'),
@@ -690,7 +757,7 @@ class _CreateRequestDialogState extends State<_CreateRequestDialog> {
   }
 
   List<String> _warehousesForArea(WorkArea? area) {
-    return WarehouseRouting.all
+    return WarehouseRouting.operational
         .where((target) => area == null || target.area == area)
         .map((target) => target.code)
         .toList();
@@ -1045,6 +1112,8 @@ class _MobileTeamAssignmentPanel extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 20),
+          _PermissionControl(operator: selected),
         ],
       ),
     );
@@ -1117,10 +1186,6 @@ class _AssignmentPanel extends StatelessWidget {
                           label: operator.username,
                         ),
                         _SoftChip(
-                          icon: Icons.password_rounded,
-                          label: 'Senha/PIN ${operator.password}',
-                        ),
-                        _SoftChip(
                           icon: Icons.verified_user_rounded,
                           label: operator.role,
                         ),
@@ -1173,6 +1238,8 @@ class _AssignmentPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
+          _PermissionControl(operator: operator),
+          const SizedBox(height: 20),
           const Text(
             'Designar para',
             style: TextStyle(
@@ -1196,6 +1263,80 @@ class _AssignmentPanel extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PermissionControl extends StatelessWidget {
+  const _PermissionControl({required this.operator});
+  final Operator operator;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<OperatorAssignmentStore>();
+    final level = store.permissionFor(operator);
+    final editable = store.canSetPermission(operator);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InputDecorator(
+          decoration: const InputDecoration(
+            labelText: 'Acesso ao setor',
+            border: OutlineInputBorder(),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<OperatorPermission>(
+              key: ValueKey('permission-${operator.username}'),
+              value: level,
+              isExpanded: true,
+              isDense: true,
+              items: [
+                for (final permission in OperatorPermission.values)
+                  DropdownMenuItem(
+                    value: permission,
+                    child: Text(permission.label),
+                  ),
+              ],
+              onChanged: !editable
+                  ? null
+                  : (value) {
+                      if (value == null || value == level) return;
+                      try {
+                        store.setPermission(operator.username, value);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Acesso de ${operator.name} atualizado.',
+                            ),
+                          ),
+                        );
+                      } catch (_) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Não foi possível salvar o acesso. Tente novamente.',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(switch (level) {
+          OperatorPermission.operation =>
+            'Trabalha na etapa atribuída, sem consultas ou relatórios.',
+          OperatorPermission.consultation =>
+            'Também consulta dados e relatórios do seu setor.',
+          OperatorPermission.manager => 'Consulta o setor e organiza a equipe.',
+        }, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+        if (!editable)
+          const Text(
+            'Acesso definido pelo responsável do setor.',
+            style: TextStyle(fontSize: 12, color: AppColors.muted),
+          ),
+      ],
     );
   }
 }

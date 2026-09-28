@@ -41,102 +41,146 @@ class FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: AppColors.border),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Flexible(flex: 3, child: _SearchField(onChanged: onBusca)),
-              const SizedBox(width: 8),
-              Flexible(
-                flex: 2,
-                child: _Dropdown(
-                  value: filtroPeriodo,
-                  items: const {
-                    'todos': 'Todos os períodos',
-                    'jun': 'Junho 2026',
-                    'mai': 'Maio 2026',
-                  },
-                  onChanged: onPeriodo,
-                ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SearchField(value: busca, onChanged: onBusca),
+            ExpansionTile(
+              title: const Text('Filtros'),
+              subtitle: Text(
+                hasActiveFilters ? 'Filtros aplicados' : 'Todas as OPs',
               ),
-              const SizedBox(width: 8),
-              Flexible(
-                flex: 2,
-                child: _Dropdown(
-                  value: filtroResponsavel,
-                  items: {
-                    'todos': 'Todos os responsáveis',
-                    for (final r in responsaveis) r: r,
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 12),
+              children: [
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth < 720
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - 24) / 3;
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: width,
+                          child: _Dropdown(
+                            label: 'Período',
+                            value: filtroPeriodo,
+                            items: const {
+                              'todos': 'Todos os períodos',
+                              'jun': 'Junho 2026',
+                              'mai': 'Maio 2026',
+                            },
+                            onChanged: onPeriodo,
+                          ),
+                        ),
+                        SizedBox(
+                          width: width,
+                          child: _Dropdown(
+                            label: 'Responsável',
+                            value: filtroResponsavel,
+                            items: {
+                              'todos': 'Todos os responsáveis',
+                              for (final r in responsaveis) r: r,
+                            },
+                            onChanged: onResponsavel,
+                          ),
+                        ),
+                        SizedBox(
+                          width: width,
+                          child: _Dropdown(
+                            label: 'Produto',
+                            value: filtroProduto,
+                            items: {
+                              'todos': 'Todos os produtos',
+                              for (final p in produtos) p: p,
+                            },
+                            onChanged: onProduto,
+                          ),
+                        ),
+                      ],
+                    );
                   },
-                  onChanged: onResponsavel,
                 ),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                flex: 2,
-                child: _Dropdown(
-                  value: filtroProduto,
-                  items: {
-                    'todos': 'Todos os produtos',
-                    for (final p in produtos) p: p,
-                  },
-                  onChanged: onProduto,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              if (hasActiveFilters)
-                TextButton(
-                  onPressed: onLimpar,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    textStyle: GoogleFonts.ibmPlexSans(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (hasActiveFilters)
+                  TextButton(
+                    onPressed: onLimpar,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      textStyle: GoogleFonts.ibmPlexSans(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
+                      minimumSize: Size.zero,
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 4,
-                    ),
-                    minimumSize: Size.zero,
+                    child: const Text('Limpar filtros'),
                   ),
-                  child: const Text('Limpar filtros'),
+                const Spacer(),
+                Text(
+                  resultText,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.muted,
+                  ),
                 ),
-              const Spacer(),
-              Text(
-                resultText,
-                style: const TextStyle(fontSize: 12.5, color: AppColors.muted),
-              ),
-              Container(
-                width: 1,
-                height: 24,
-                color: AppColors.border,
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-              ),
-              _ViewToggle(mode: viewMode, onChanged: onViewMode),
-            ],
-          ),
-        ],
+                Container(
+                  width: 1,
+                  height: 24,
+                  color: AppColors.border,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                _ViewToggle(mode: viewMode, onChanged: onViewMode),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _SearchField extends StatelessWidget {
+class _SearchField extends StatefulWidget {
+  final String value;
   final ValueChanged<String> onChanged;
 
-  const _SearchField({required this.onChanged});
+  const _SearchField({required this.value, required this.onChanged});
+
+  @override
+  State<_SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends State<_SearchField> {
+  late final _controller = TextEditingController(text: widget.value);
+
+  @override
+  void didUpdateWidget(covariant _SearchField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_controller.text != widget.value) _controller.text = widget.value;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -152,7 +196,8 @@ class _SearchField extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
-              onChanged: onChanged,
+              controller: _controller,
+              onChanged: widget.onChanged,
               decoration: InputDecoration(
                 hintText: 'Buscar OP ou produto...',
                 hintStyle: GoogleFonts.ibmPlexSans(
@@ -160,6 +205,9 @@ class _SearchField extends StatelessWidget {
                   color: AppColors.muted,
                 ),
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -176,11 +224,13 @@ class _SearchField extends StatelessWidget {
 }
 
 class _Dropdown extends StatelessWidget {
+  final String label;
   final String value;
   final Map<String, String> items;
   final ValueChanged<String> onChanged;
 
   const _Dropdown({
+    required this.label,
     required this.value,
     required this.items,
     required this.onChanged,
@@ -188,17 +238,26 @@ class _Dropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.borderField),
-        borderRadius: BorderRadius.circular(8),
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
           isDense: true,
           isExpanded: true,
+          selectedItemBuilder: (context) => [
+            for (final text in items.values)
+              Tooltip(
+                message: text,
+                child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+          ],
           icon: const Icon(Icons.keyboard_arrow_down, size: 18),
           style: GoogleFonts.ibmPlexSans(
             fontSize: 13,

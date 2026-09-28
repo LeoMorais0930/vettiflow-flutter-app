@@ -1,0 +1,146 @@
+{
+  "users": {
+    "sql": "SELECT RTRIM(USR_CODIGO) login,RTRIM(USR_NOME) name FROM dbo.SYS_USR WHERE D_E_L_E_T_='' AND (LOWER(USR_CODIGO) LIKE 'tatian%' OR LOWER(USR_CODIGO) LIKE 'andres%')",
+    "params": [],
+    "rows": [
+      {
+        "login": "andressa.camargo",
+        "name": "Andressa Camargo"
+      },
+      {
+        "login": "TATIANE",
+        "name": "Tatiane"
+      }
+    ]
+  },
+  "production_destinations": {
+    "sql": "SELECT RTRIM(d.D3_LOCAL) destination,RTRIM(d.D3_USUARIO) login,COUNT_BIG(*) records,COUNT(DISTINCT d.D3_OP) ops FROM dbo.SD3010 d WHERE d.D_E_L_E_T_='' AND d.D3_FILIAL='04' AND d.D3_EMISSAO>=? AND d.D3_CF='PR0' AND EXISTS(SELECT 1 FROM dbo.SC2010 c WHERE c.D_E_L_E_T_='' AND c.C2_FILIAL=d.D3_FILIAL AND c.C2_LOCAL='05' AND c.C2_NUM+c.C2_ITEM+c.C2_SEQUEN=d.D3_OP) GROUP BY d.D3_LOCAL,d.D3_USUARIO ORDER BY d.D3_LOCAL,d.D3_USUARIO",
+    "params": [
+      "20260624"
+    ],
+    "rows": [
+      {
+        "destination": "05",
+        "login": "andressa.camargo",
+        "records": 46,
+        "ops": 46
+      },
+      {
+        "destination": "05",
+        "login": "expedicao",
+        "records": 3,
+        "ops": 3
+      },
+      {
+        "destination": "05",
+        "login": "TATIANE",
+        "records": 85,
+        "ops": 82
+      },
+      {
+        "destination": "07",
+        "login": "TATIANE",
+        "records": 4,
+        "ops": 4
+      },
+      {
+        "destination": "10",
+        "login": "andressa.camargo",
+        "records": 54,
+        "ops": 42
+      },
+      {
+        "destination": "10",
+        "login": "TATIANE",
+        "records": 104,
+        "ops": 88
+      }
+    ]
+  },
+  "op_state": {
+    "sql": "SELECT CASE WHEN C2_DATRF='' THEN 'open' ELSE 'closed' END state,COUNT_BIG(*) records,MIN(C2_EMISSAO) firstDate,MAX(C2_EMISSAO) lastDate FROM dbo.SC2010 WHERE D_E_L_E_T_='' AND C2_FILIAL='04' AND C2_LOCAL='05' GROUP BY CASE WHEN C2_DATRF='' THEN 'open' ELSE 'closed' END",
+    "params": [],
+    "rows": [
+      {
+        "state": "closed",
+        "records": 3405,
+        "firstDate": "20201118",
+        "lastDate": "20260918"
+      },
+      {
+        "state": "open",
+        "records": 139,
+        "firstDate": "20240207",
+        "lastDate": "20260918"
+      }
+    ]
+  },
+  "internal_movements_05": {
+    "sql": "SELECT RTRIM(D3_CF) cf,RTRIM(D3_TM) tm,COUNT_BIG(*) records FROM dbo.SD3010 WHERE D_E_L_E_T_='' AND D3_FILIAL='04' AND D3_LOCAL='05' AND D3_EMISSAO>=? GROUP BY D3_CF,D3_TM ORDER BY D3_CF,D3_TM",
+    "params": [
+      "20260624"
+    ],
+    "rows": [
+      {
+        "cf": "DE0",
+        "tm": "400",
+        "records": 1
+      },
+      {
+        "cf": "DE4",
+        "tm": "499",
+        "records": 763
+      },
+      {
+        "cf": "DE7",
+        "tm": "499",
+        "records": 9
+      },
+      {
+        "cf": "PR0",
+        "tm": "001",
+        "records": 139
+      },
+      {
+        "cf": "RE0",
+        "tm": "501",
+        "records": 4
+      },
+      {
+        "cf": "RE1",
+        "tm": "999",
+        "records": 1773
+      },
+      {
+        "cf": "RE4",
+        "tm": "999",
+        "records": 587
+      },
+      {
+        "cf": "RE7",
+        "tm": "999",
+        "records": 1
+      }
+    ]
+  },
+  "support_expedition_transfers": {
+    "sql": "SELECT RTRIM(d.D3_LOCAL) destination,COUNT_BIG(*) records FROM dbo.SD3010 d WHERE d.D_E_L_E_T_='' AND d.D3_FILIAL='04' AND d.D3_CF='DE4' AND d.D3_LOCAL IN ('06','07','10') AND d.D3_EMISSAO>=? AND d.D3_NUMSEQ<>'' AND EXISTS(SELECT 1 FROM dbo.SD3010 p WHERE p.D_E_L_E_T_='' AND p.D3_FILIAL=d.D3_FILIAL AND p.D3_EMISSAO=d.D3_EMISSAO AND p.D3_DOC=d.D3_DOC AND p.D3_NUMSEQ=d.D3_NUMSEQ AND p.D3_ESTORNO=d.D3_ESTORNO AND p.D3_LOCAL='05' AND p.D3_CF='RE4') GROUP BY d.D3_LOCAL",
+    "params": [
+      "20260624"
+    ],
+    "rows": [
+      {
+        "destination": "06",
+        "records": 278
+      },
+      {
+        "destination": "07",
+        "records": 107
+      },
+      {
+        "destination": "10",
+        "records": 181
+      }
+    ]
+  }
+}

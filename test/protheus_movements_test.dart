@@ -349,4 +349,80 @@ void main() {
     expect(modConsumption.quantity, 4);
     expect(modConsumption.affectsStockBalance, isFalse);
   });
+
+  test('uses historical 05 -> 10 routing for finished-product PR0', () {
+    final createdAt = DateTime(2026, 8, 5, 8, 15);
+    final completedAt = DateTime(2026, 8, 5, 16, 40);
+    final order = ProductionOrderFlow(
+      number: 'OP-2026-565333',
+      productCode: '575-0863',
+      productName: 'PRODUTO COM HISTORICO 05 10',
+      quantity: 6,
+      currentStage: ProductionStage.completed,
+      status: ProductionRunStatus.completed,
+      priority: 'Media',
+      createdAt: createdAt,
+      updatedAt: completedAt,
+      operatorName: 'Tatiane',
+      operatorPin: '2001',
+      orderWarehouse: '05',
+      closedQuantity: 4,
+    );
+    const catalogItem = ProductionCatalogItem(
+      code: '575-0863',
+      name: 'PRODUTO COM HISTORICO 05 10',
+      defaultQuantity: 6,
+      unit: 'PC',
+      components: [
+        ProductionComponent(
+          code: '100-010',
+          description: 'PARAFUSO 2,9 X 6,5 MM ZI',
+          quantity: 2,
+          stock: 3803,
+          filial: '04',
+          armazem: '01',
+          structureSequence: '010',
+        ),
+      ],
+    );
+
+    final completion = ProtheusProductionCompletionPlan.fromOrder(
+      order,
+      catalogItem,
+    );
+
+    expect(completion.finishedProduct.sd3Payload['d3_local'], '10');
+    expect(completion.consumptions.single.sd3Payload['d3_local'], '01');
+  });
+
+  test(
+    'blocks PR0 planning when finished-product destination is uncertain',
+    () {
+      final now = DateTime(2026, 8, 5, 16, 40);
+      final order = ProductionOrderFlow(
+        number: 'OP-2026-565334',
+        productCode: '999-0000',
+        productName: 'PRODUTO SEM HISTORICO',
+        quantity: 6,
+        currentStage: ProductionStage.completed,
+        status: ProductionRunStatus.completed,
+        priority: 'Media',
+        createdAt: now,
+        updatedAt: now,
+        orderWarehouse: '02',
+      );
+      const catalogItem = ProductionCatalogItem(
+        code: '999-0000',
+        name: 'PRODUTO SEM HISTORICO',
+        defaultQuantity: 6,
+        unit: 'PC',
+        components: [],
+      );
+
+      expect(
+        () => ProtheusProductionCompletionPlan.fromOrder(order, catalogItem),
+        throwsA(isA<StateError>()),
+      );
+    },
+  );
 }

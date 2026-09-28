@@ -1,0 +1,2027 @@
+{
+  "database": "HMLp12",
+  "company": "010",
+  "branch": "04",
+  "checkedAt": "2026-09-24T18:41:35.939089+00:00",
+  "queries": {
+    "warehouses": {
+      "sql": "SELECT NNR_FILIAL filial,NNR_CODIGO code,NNR_DESCRI description FROM [dbo].[NNR010] WHERE D_E_L_E_T_='' AND NNR_CODIGO IN ('10')",
+      "params": [],
+      "rows": [
+        {
+          "filial": "",
+          "code": "10",
+          "description": "EXPEDICAO"
+        }
+      ]
+    },
+    "users": {
+      "sql": "SELECT USR_ID id,USR_CODIGO username,USR_NOME name FROM dbo.SYS_USR WHERE D_E_L_E_T_='' AND (USR_CODIGO LIKE '%expedi%' OR USR_NOME LIKE '%rafaela%' OR USR_NOME LIKE '%tamara%' OR USR_NOME LIKE '%bruna%')",
+      "params": [],
+      "rows": [
+        {
+          "id": "000026",
+          "username": "bruna",
+          "name": "Bruna Guerra"
+        },
+        {
+          "id": "000027",
+          "username": "rafaela",
+          "name": "Rafaela Aparecida Alves"
+        },
+        {
+          "id": "000060",
+          "username": "expedicao",
+          "name": "Bruna e Tamara"
+        }
+      ]
+    },
+    "all_internal": {
+      "sql": "SELECT D3_LOCAL warehouse,D3_CF cf,D3_TM tm,D3_ESTORNO reversed,COUNT_BIG(*) records,MIN(D3_EMISSAO) firstDate,MAX(D3_EMISSAO) latestDate FROM [dbo].[SD3010] WHERE D_E_L_E_T_='' AND D3_FILIAL='04' AND D3_LOCAL IN ('10') GROUP BY D3_LOCAL,D3_CF,D3_TM,D3_ESTORNO ORDER BY D3_LOCAL,D3_CF,D3_TM",
+      "params": [],
+      "rows": [
+        {
+          "warehouse": "10",
+          "cf": "DE0",
+          "tm": "400",
+          "reversed": "",
+          "records": 145,
+          "firstDate": "20230309",
+          "latestDate": "20260812"
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE0",
+          "tm": "499",
+          "reversed": "",
+          "records": 230,
+          "firstDate": "20230327",
+          "latestDate": "20251218"
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE4",
+          "tm": "499",
+          "reversed": "",
+          "records": 13197,
+          "firstDate": "20230308",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE6",
+          "tm": "200",
+          "reversed": "",
+          "records": 80,
+          "firstDate": "20250402",
+          "latestDate": "20251231"
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE7",
+          "tm": "499",
+          "reversed": "",
+          "records": 35,
+          "firstDate": "20240214",
+          "latestDate": "20260914"
+        },
+        {
+          "warehouse": "10",
+          "cf": "PR0",
+          "tm": "001",
+          "reversed": "",
+          "records": 8726,
+          "firstDate": "20230309",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE0",
+          "tm": "501",
+          "reversed": "",
+          "records": 139,
+          "firstDate": "20230329",
+          "latestDate": "20260520"
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE0",
+          "tm": "999",
+          "reversed": "",
+          "records": 458,
+          "firstDate": "20230327",
+          "latestDate": "20251218"
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE1",
+          "tm": "999",
+          "reversed": "",
+          "records": 36289,
+          "firstDate": "20230309",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE4",
+          "tm": "999",
+          "reversed": "",
+          "records": 1991,
+          "firstDate": "20230309",
+          "latestDate": "20260917"
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE6",
+          "tm": "600",
+          "reversed": "",
+          "records": 56,
+          "firstDate": "20250402",
+          "latestDate": "20251231"
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE7",
+          "tm": "999",
+          "reversed": "",
+          "records": 16,
+          "firstDate": "20240214",
+          "latestDate": "20260914"
+        }
+      ]
+    },
+    "recent_internal": {
+      "sql": "SELECT D3_LOCAL warehouse,D3_CF cf,D3_TM tm,D3_USUARIO operator,D3_ESTORNO reversed,COUNT_BIG(*) records FROM [dbo].[SD3010] WHERE D_E_L_E_T_='' AND D3_FILIAL='04' AND D3_LOCAL IN ('10') AND D3_EMISSAO BETWEEN ? AND ? GROUP BY D3_LOCAL,D3_CF,D3_TM,D3_USUARIO,D3_ESTORNO ORDER BY D3_LOCAL,D3_CF",
+      "params": [
+        "20260624",
+        "20260924"
+      ],
+      "rows": [
+        {
+          "warehouse": "10",
+          "cf": "DE0",
+          "tm": "400",
+          "operator": "artur",
+          "reversed": "",
+          "records": 7
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE4",
+          "tm": "499",
+          "operator": "andressa.camargo",
+          "reversed": "",
+          "records": 7
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE4",
+          "tm": "499",
+          "operator": "guilhermem",
+          "reversed": "",
+          "records": 53
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE4",
+          "tm": "499",
+          "operator": "matheus",
+          "reversed": "",
+          "records": 3
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE4",
+          "tm": "499",
+          "operator": "natalina.rosimeire",
+          "reversed": "",
+          "records": 66
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE4",
+          "tm": "499",
+          "operator": "rosangela.prestes",
+          "reversed": "",
+          "records": 24
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE4",
+          "tm": "499",
+          "operator": "silvania.teixeira",
+          "reversed": "",
+          "records": 57
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE4",
+          "tm": "499",
+          "operator": "TATIANE",
+          "reversed": "",
+          "records": 229
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE4",
+          "tm": "499",
+          "operator": "vera",
+          "reversed": "",
+          "records": 23
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE4",
+          "tm": "499",
+          "operator": "vinicius",
+          "reversed": "",
+          "records": 2
+        },
+        {
+          "warehouse": "10",
+          "cf": "DE7",
+          "tm": "499",
+          "operator": "artur",
+          "reversed": "",
+          "records": 5
+        },
+        {
+          "warehouse": "10",
+          "cf": "PR0",
+          "tm": "001",
+          "operator": "andressa.camargo",
+          "reversed": "",
+          "records": 57
+        },
+        {
+          "warehouse": "10",
+          "cf": "PR0",
+          "tm": "001",
+          "operator": "expedicao",
+          "reversed": "",
+          "records": 376
+        },
+        {
+          "warehouse": "10",
+          "cf": "PR0",
+          "tm": "001",
+          "operator": "TATIANE",
+          "reversed": "",
+          "records": 333
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE1",
+          "tm": "999",
+          "operator": "andressa.camargo",
+          "reversed": "",
+          "records": 12
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE1",
+          "tm": "999",
+          "operator": "expedicao",
+          "reversed": "",
+          "records": 1758
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE1",
+          "tm": "999",
+          "operator": "TATIANE",
+          "reversed": "",
+          "records": 1154
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE4",
+          "tm": "999",
+          "operator": "andressa.camargo",
+          "reversed": "",
+          "records": 40
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE4",
+          "tm": "999",
+          "operator": "expedicao",
+          "reversed": "",
+          "records": 99
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE4",
+          "tm": "999",
+          "operator": "guilhermem",
+          "reversed": "",
+          "records": 2
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE4",
+          "tm": "999",
+          "operator": "matheus",
+          "reversed": "",
+          "records": 20
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE4",
+          "tm": "999",
+          "operator": "TATIANE",
+          "reversed": "",
+          "records": 73
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE4",
+          "tm": "999",
+          "operator": "vinicius",
+          "reversed": "",
+          "records": 2
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE7",
+          "tm": "999",
+          "operator": "artur",
+          "reversed": "",
+          "records": 3
+        },
+        {
+          "warehouse": "10",
+          "cf": "RE7",
+          "tm": "999",
+          "operator": "vitor.vasconcelos",
+          "reversed": "",
+          "records": 1
+        }
+      ]
+    },
+    "orders": {
+      "sql": "SELECT C2_LOCAL warehouse,CASE WHEN C2_DATRF='' THEN 'open' ELSE 'closed' END status,COUNT_BIG(*) records,MIN(C2_EMISSAO) firstDate,MAX(C2_EMISSAO) latestDate FROM [dbo].[SC2010] WHERE D_E_L_E_T_='' AND C2_FILIAL='04' AND C2_LOCAL IN ('10') GROUP BY C2_LOCAL,CASE WHEN C2_DATRF='' THEN 'open' ELSE 'closed' END",
+      "params": [],
+      "rows": [
+        {
+          "warehouse": "10",
+          "status": "closed",
+          "records": 6717,
+          "firstDate": "20230309",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "status": "open",
+          "records": 40,
+          "firstDate": "20240130",
+          "latestDate": "20260910"
+        }
+      ]
+    },
+    "stock": {
+      "sql": "SELECT B2_LOCAL warehouse,COUNT_BIG(*) products,SUM(CASE WHEN B2_QATU<>0 THEN 1 ELSE 0 END) nonzero FROM [dbo].[SB2010] WHERE D_E_L_E_T_='' AND B2_FILIAL='04' AND B2_LOCAL IN ('10') GROUP BY B2_LOCAL",
+      "params": [],
+      "rows": [
+        {
+          "warehouse": "10",
+          "products": 2183,
+          "nonzero": 144
+        }
+      ]
+    },
+    "recent_transfers": {
+      "sql": "SELECT d.D3_LOCAL origin,p.D3_LOCAL destination,COUNT_BIG(*) pairs FROM [dbo].[SD3010] d JOIN [dbo].[SD3010] p ON p.D_E_L_E_T_='' AND p.D3_FILIAL=d.D3_FILIAL AND p.D3_DOC=d.D3_DOC AND p.D3_NUMSEQ=d.D3_NUMSEQ AND p.D3_EMISSAO=d.D3_EMISSAO AND p.D3_ESTORNO=d.D3_ESTORNO AND p.D3_CF='DE4' WHERE d.D_E_L_E_T_='' AND d.D3_FILIAL='04' AND d.D3_CF='RE4' AND d.D3_NUMSEQ<>'' AND d.D3_ESTORNO<>'S' AND d.D3_EMISSAO BETWEEN ? AND ? AND (d.D3_LOCAL IN ('10') OR p.D3_LOCAL IN ('10')) GROUP BY d.D3_LOCAL,p.D3_LOCAL ORDER BY origin,destination",
+      "params": [
+        "20260624",
+        "20260924"
+      ],
+      "rows": [
+        {
+          "origin": "01",
+          "destination": "10",
+          "pairs": 247
+        },
+        {
+          "origin": "03",
+          "destination": "10",
+          "pairs": 2
+        },
+        {
+          "origin": "05",
+          "destination": "10",
+          "pairs": 181
+        },
+        {
+          "origin": "06",
+          "destination": "10",
+          "pairs": 7
+        },
+        {
+          "origin": "07",
+          "destination": "10",
+          "pairs": 6
+        },
+        {
+          "origin": "08",
+          "destination": "10",
+          "pairs": 2
+        },
+        {
+          "origin": "10",
+          "destination": "01",
+          "pairs": 2
+        },
+        {
+          "origin": "10",
+          "destination": "05",
+          "pairs": 5
+        },
+        {
+          "origin": "10",
+          "destination": "06",
+          "pairs": 22
+        },
+        {
+          "origin": "10",
+          "destination": "07",
+          "pairs": 199
+        },
+        {
+          "origin": "10",
+          "destination": "10",
+          "pairs": 8
+        },
+        {
+          "origin": "70",
+          "destination": "10",
+          "pairs": 11
+        }
+      ]
+    },
+    "recent_SD1": {
+      "sql": "SELECT d.D1_LOCAL warehouse,d.D1_TES tes,d.D1_CF cfop,f.F4_TEXTO description,f.F4_ESTOQUE stock,COUNT_BIG(*) items,MIN(d.D1_DTDIGIT) firstDate,MAX(d.D1_DTDIGIT) latestDate FROM [dbo].[SD1010] d OUTER APPLY (SELECT TOP (1) F4_TEXTO,F4_ESTOQUE FROM [dbo].[SF4010] WHERE D_E_L_E_T_='' AND F4_CODIGO=d.D1_TES AND F4_FILIAL IN (d.D1_FILIAL,'') ORDER BY CASE WHEN F4_FILIAL=d.D1_FILIAL THEN 0 ELSE 1 END,R_E_C_N_O_) f WHERE d.D_E_L_E_T_='' AND d.D1_FILIAL='04' AND d.D1_LOCAL IN ('10') AND d.D1_DTDIGIT BETWEEN ? AND ? GROUP BY d.D1_LOCAL,d.D1_TES,d.D1_CF,f.F4_TEXTO,f.F4_ESTOQUE",
+      "params": [
+        "20260624",
+        "20260924"
+      ],
+      "rows": [
+        {
+          "warehouse": "10",
+          "tes": "028",
+          "cfop": "1556",
+          "description": "COMPRA CONSUMO",
+          "stock": "N",
+          "items": 1,
+          "firstDate": "20260626",
+          "latestDate": "20260626"
+        },
+        {
+          "warehouse": "10",
+          "tes": "079",
+          "cfop": "2915",
+          "description": "ENTRADA DE MERCADORIA OU BEM RECEBIDO PARA CONSERTO OU REPARO",
+          "stock": "N",
+          "items": 47,
+          "firstDate": "20260624",
+          "latestDate": "20260914"
+        },
+        {
+          "warehouse": "10",
+          "tes": "440",
+          "cfop": "2201",
+          "description": "DEVOLUCAO VENDA  PROD",
+          "stock": "S",
+          "items": 12,
+          "firstDate": "20260911",
+          "latestDate": "20260911"
+        },
+        {
+          "warehouse": "10",
+          "tes": "098",
+          "cfop": "2913",
+          "description": "RETORNO REMESSA DE MOSTRUARIO",
+          "stock": "S",
+          "items": 10,
+          "firstDate": "20260717",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "tes": "079",
+          "cfop": "1915",
+          "description": "ENTRADA DE MERCADORIA OU BEM RECEBIDO PARA CONSERTO OU REPARO",
+          "stock": "N",
+          "items": 17,
+          "firstDate": "20260624",
+          "latestDate": "20260720"
+        },
+        {
+          "warehouse": "10",
+          "tes": "102",
+          "cfop": "2201",
+          "description": "DEVOLUCAO VENDA  PROD",
+          "stock": "S",
+          "items": 2,
+          "firstDate": "20260813",
+          "latestDate": "20260813"
+        },
+        {
+          "warehouse": "10",
+          "tes": "098",
+          "cfop": "1913",
+          "description": "RETORNO REMESSA DE MOSTRUARIO",
+          "stock": "S",
+          "items": 11,
+          "firstDate": "20260730",
+          "latestDate": "20260911"
+        }
+      ]
+    },
+    "recent_SD2": {
+      "sql": "SELECT d.D2_LOCAL warehouse,d.D2_TES tes,d.D2_CF cfop,f.F4_TEXTO description,f.F4_ESTOQUE stock,COUNT_BIG(*) items,MIN(d.D2_EMISSAO) firstDate,MAX(d.D2_EMISSAO) latestDate FROM [dbo].[SD2010] d OUTER APPLY (SELECT TOP (1) F4_TEXTO,F4_ESTOQUE FROM [dbo].[SF4010] WHERE D_E_L_E_T_='' AND F4_CODIGO=d.D2_TES AND F4_FILIAL IN (d.D2_FILIAL,'') ORDER BY CASE WHEN F4_FILIAL=d.D2_FILIAL THEN 0 ELSE 1 END,R_E_C_N_O_) f WHERE d.D_E_L_E_T_='' AND d.D2_FILIAL='04' AND d.D2_LOCAL IN ('10') AND d.D2_EMISSAO BETWEEN ? AND ? GROUP BY d.D2_LOCAL,d.D2_TES,d.D2_CF,f.F4_TEXTO,f.F4_ESTOQUE",
+      "params": [
+        "20260624",
+        "20260924"
+      ],
+      "rows": [
+        {
+          "warehouse": "10",
+          "tes": "502",
+          "cfop": "6101",
+          "description": "VENDA DE PRODUCAO DO ESTABELECIMENTO",
+          "stock": "S",
+          "items": 12,
+          "firstDate": "20260629",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "tes": "582",
+          "cfop": "6101",
+          "description": "VENDA PRODUCAO",
+          "stock": "S",
+          "items": 3,
+          "firstDate": "20260727",
+          "latestDate": "20260805"
+        },
+        {
+          "warehouse": "10",
+          "tes": "589",
+          "cfop": "5102",
+          "description": "VENDA DE MERCADORIA ADQUIRIDA DE TERCEIROS",
+          "stock": "S",
+          "items": 13,
+          "firstDate": "20260720",
+          "latestDate": "20260909"
+        },
+        {
+          "warehouse": "10",
+          "tes": "610",
+          "cfop": "6116",
+          "description": "REMESSA - ENTREGA FUTURA",
+          "stock": "S",
+          "items": 3,
+          "firstDate": "20260624",
+          "latestDate": "20260813"
+        },
+        {
+          "warehouse": "10",
+          "tes": "512",
+          "cfop": "6403",
+          "description": "VENDA INTER SUBS TRI",
+          "stock": "S",
+          "items": 2,
+          "firstDate": "20260624",
+          "latestDate": "20260812"
+        },
+        {
+          "warehouse": "10",
+          "tes": "536",
+          "cfop": "6107",
+          "description": "VENDA DE PRODUCAO DO ESTABELECIMENTO",
+          "stock": "S",
+          "items": 19,
+          "firstDate": "20260626",
+          "latestDate": "20260911"
+        },
+        {
+          "warehouse": "10",
+          "tes": "550",
+          "cfop": "5910",
+          "description": "REMESSA EM BONIFICACAO, DOACAO OU BRINDE",
+          "stock": "S",
+          "items": 12,
+          "firstDate": "20260626",
+          "latestDate": "20260917"
+        },
+        {
+          "warehouse": "10",
+          "tes": "587",
+          "cfop": "5116",
+          "description": "REMESSA ENTREGA FUTURA CONS. FINAL",
+          "stock": "S",
+          "items": 1,
+          "firstDate": "20260708",
+          "latestDate": "20260708"
+        },
+        {
+          "warehouse": "10",
+          "tes": "597",
+          "cfop": "6915",
+          "description": "REMESSA CONSERTO",
+          "stock": "S",
+          "items": 4,
+          "firstDate": "20260915",
+          "latestDate": "20260915"
+        },
+        {
+          "warehouse": "10",
+          "tes": "625",
+          "cfop": "5102",
+          "description": "VENDA DE MERCADORIA ADQUIRIDA DE TERCEIROS",
+          "stock": "S",
+          "items": 3,
+          "firstDate": "20260720",
+          "latestDate": "20260909"
+        },
+        {
+          "warehouse": "10",
+          "tes": "701",
+          "cfop": "6910",
+          "description": "REMESSA EM BONIFICACAO, DOACAO OU BRINDE",
+          "stock": "N",
+          "items": 3,
+          "firstDate": "20260629",
+          "latestDate": "20260629"
+        },
+        {
+          "warehouse": "10",
+          "tes": "536",
+          "cfop": "5101",
+          "description": "VENDA DE PRODUCAO DO ESTABELECIMENTO",
+          "stock": "S",
+          "items": 152,
+          "firstDate": "20260624",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "tes": "572",
+          "cfop": "5916",
+          "description": "RETORNO DE MERCADORIA/BEM RECEBIDO PARA REPARO OU CONSERTO",
+          "stock": "N",
+          "items": 4,
+          "firstDate": "20260715",
+          "latestDate": "20260720"
+        },
+        {
+          "warehouse": "10",
+          "tes": "580",
+          "cfop": "6109",
+          "description": "VENDA MERCADORIA DESTINADA ZONA FRANCA DE MANAUS",
+          "stock": "S",
+          "items": 31,
+          "firstDate": "20260630",
+          "latestDate": "20260904"
+        },
+        {
+          "warehouse": "10",
+          "tes": "584",
+          "cfop": "5912",
+          "description": "REMESSA DE MOSTRUARIO",
+          "stock": "S",
+          "items": 16,
+          "firstDate": "20260715",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "tes": "584",
+          "cfop": "6912",
+          "description": "REMESSA DE MOSTRUARIO",
+          "stock": "S",
+          "items": 21,
+          "firstDate": "20260626",
+          "latestDate": "20260903"
+        },
+        {
+          "warehouse": "10",
+          "tes": "589",
+          "cfop": "6102",
+          "description": "VENDA DE MERCADORIA ADQUIRIDA DE TERCEIROS",
+          "stock": "S",
+          "items": 1,
+          "firstDate": "20260728",
+          "latestDate": "20260728"
+        },
+        {
+          "warehouse": "10",
+          "tes": "609",
+          "cfop": "5922",
+          "description": "FATURAMENTO ANTECIPADO - VENDA PARA ENTREGA FUTURA",
+          "stock": "N",
+          "items": 1,
+          "firstDate": "20260715",
+          "latestDate": "20260715"
+        },
+        {
+          "warehouse": "10",
+          "tes": "620",
+          "cfop": "5102",
+          "description": "VENDA DE MERCADORIA ADQUIRIDA DE TERCEIROS",
+          "stock": "S",
+          "items": 3,
+          "firstDate": "20260720",
+          "latestDate": "20260909"
+        },
+        {
+          "warehouse": "10",
+          "tes": "689",
+          "cfop": "6401",
+          "description": "COMPLEMENTO ICMS ST",
+          "stock": "N",
+          "items": 4,
+          "firstDate": "20260903",
+          "latestDate": "20260903"
+        },
+        {
+          "warehouse": "10",
+          "tes": "711",
+          "cfop": "6401",
+          "description": "VENDA DE PRODUCAO DO ESTABELECIMENTO OPERACAO COM SUBSTITUICAO TRIBUTARIA",
+          "stock": "S",
+          "items": 1,
+          "firstDate": "20260911",
+          "latestDate": "20260911"
+        },
+        {
+          "warehouse": "10",
+          "tes": "502",
+          "cfop": "5101",
+          "description": "VENDA DE PRODUCAO DO ESTABELECIMENTO",
+          "stock": "S",
+          "items": 5,
+          "firstDate": "20260723",
+          "latestDate": "20260806"
+        },
+        {
+          "warehouse": "10",
+          "tes": "549",
+          "cfop": "5910",
+          "description": "REMESSA EM BONIFICACAO, DOACAO OU BRINDE",
+          "stock": "S",
+          "items": 5,
+          "firstDate": "20260903",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "tes": "550",
+          "cfop": "6910",
+          "description": "REMESSA EM BONIFICACAO, DOACAO OU BRINDE",
+          "stock": "S",
+          "items": 31,
+          "firstDate": "20260626",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "tes": "569",
+          "cfop": "6107",
+          "description": "VENDA CONSUMIDOR FINAL",
+          "stock": "S",
+          "items": 167,
+          "firstDate": "20260624",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "tes": "625",
+          "cfop": "6108",
+          "description": "VENDA DE MERCADORIA ADQUIRIDA DE TERCEIROS",
+          "stock": "S",
+          "items": 1,
+          "firstDate": "20260625",
+          "latestDate": "20260625"
+        },
+        {
+          "warehouse": "10",
+          "tes": "705",
+          "cfop": "5401",
+          "description": "VENDA DE PRODUCAO DO ESTABELECIMENTO OPERACAO COM SUBSTITUICAO TRIBUTARIA",
+          "stock": "S",
+          "items": 1,
+          "firstDate": "20260806",
+          "latestDate": "20260806"
+        },
+        {
+          "warehouse": "10",
+          "tes": "705",
+          "cfop": "6401",
+          "description": "VENDA DE PRODUCAO DO ESTABELECIMENTO OPERACAO COM SUBSTITUICAO TRIBUTARIA",
+          "stock": "S",
+          "items": 6,
+          "firstDate": "20260707",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "tes": "533",
+          "cfop": "7101",
+          "description": "EXPORTACAO",
+          "stock": "S",
+          "items": 15,
+          "firstDate": "20260731",
+          "latestDate": "20260811"
+        },
+        {
+          "warehouse": "10",
+          "tes": "540",
+          "cfop": "6949",
+          "description": "REMESSA EM GARANTIA",
+          "stock": "S",
+          "items": 1,
+          "firstDate": "20260721",
+          "latestDate": "20260721"
+        },
+        {
+          "warehouse": "10",
+          "tes": "549",
+          "cfop": "6910",
+          "description": "REMESSA EM BONIFICACAO, DOACAO OU BRINDE",
+          "stock": "S",
+          "items": 4,
+          "firstDate": "20260805",
+          "latestDate": "20260914"
+        },
+        {
+          "warehouse": "10",
+          "tes": "582",
+          "cfop": "5101",
+          "description": "VENDA PRODUCAO",
+          "stock": "S",
+          "items": 271,
+          "firstDate": "20260624",
+          "latestDate": "20260909"
+        },
+        {
+          "warehouse": "10",
+          "tes": "625",
+          "cfop": "6102",
+          "description": "VENDA DE MERCADORIA ADQUIRIDA DE TERCEIROS",
+          "stock": "S",
+          "items": 4,
+          "firstDate": "20260626",
+          "latestDate": "20260728"
+        },
+        {
+          "warehouse": "10",
+          "tes": "707",
+          "cfop": "6401",
+          "description": "VENDA DE PRODUCAO DO ESTABELECIMENTO OPERACAO COM SUBSTITUICAO TRIBUTARIA",
+          "stock": "S",
+          "items": 142,
+          "firstDate": "20260624",
+          "latestDate": "20260828"
+        },
+        {
+          "warehouse": "10",
+          "tes": "800",
+          "cfop": "5101",
+          "description": "PRESTACAO DE SERVICOS",
+          "stock": "N",
+          "items": 2,
+          "firstDate": "20260825",
+          "latestDate": "20260826"
+        },
+        {
+          "warehouse": "10",
+          "tes": "536",
+          "cfop": "6101",
+          "description": "VENDA DE PRODUCAO DO ESTABELECIMENTO",
+          "stock": "S",
+          "items": 491,
+          "firstDate": "20260624",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "tes": "572",
+          "cfop": "6916",
+          "description": "RETORNO DE MERCADORIA/BEM RECEBIDO PARA REPARO OU CONSERTO",
+          "stock": "N",
+          "items": 40,
+          "firstDate": "20260715",
+          "latestDate": "20260915"
+        },
+        {
+          "warehouse": "10",
+          "tes": "599",
+          "cfop": "6401",
+          "description": "VENDA DIFAL CONSUMIDOR FINAL",
+          "stock": "S",
+          "items": 21,
+          "firstDate": "20260828",
+          "latestDate": "20260918"
+        },
+        {
+          "warehouse": "10",
+          "tes": "800",
+          "cfop": "5933",
+          "description": "PRESTACAO DE SERVICOS",
+          "stock": "N",
+          "items": 27,
+          "firstDate": "20260629",
+          "latestDate": "20260904"
+        },
+        {
+          "warehouse": "10",
+          "tes": "800",
+          "cfop": "6933",
+          "description": "PRESTACAO DE SERVICOS",
+          "stock": "N",
+          "items": 21,
+          "firstDate": "20260702",
+          "latestDate": "20260817"
+        }
+      ]
+    },
+    "fiscal_schema": {
+      "sql": "SELECT t.name tableName,c.name columnName FROM sys.tables t JOIN sys.columns c ON c.object_id=t.object_id WHERE t.name IN ('SD2010','SF2010') AND (c.name LIKE 'F2_%' OR c.name IN ('D2_PEDIDO','D2_ITEMPV','D2_TIPO')) ORDER BY t.name,c.column_id",
+      "params": [],
+      "rows": [
+        {
+          "tableName": "SD2010",
+          "columnName": "D2_PEDIDO"
+        },
+        {
+          "tableName": "SD2010",
+          "columnName": "D2_ITEMPV"
+        },
+        {
+          "tableName": "SD2010",
+          "columnName": "D2_TIPO"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DOC"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SERIE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CLIENTE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_LOJA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_COND"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DUPL"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_EMISSAO"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_EST"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FRETE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SEGURO"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ICMFRET"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TIPOCLI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALBRUT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALICM"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASEICM"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALIPI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASEIPI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALMERC"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NFORI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DESCONT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SERIORI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TIPO"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ESPECI1"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ESPECI2"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ESPECI3"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ESPECI4"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VOLUME1"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VOLUME2"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VOLUME3"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VOLUME4"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ICMSRET"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_PLIQUI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_PBRUTO"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TRANSP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_REDESP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VEND1"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VEND2"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VEND3"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VEND4"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VEND5"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_OK"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FIMP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DTLANC"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DTREAJ"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_REAJUST"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DTBASE0"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FATORB0"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DTBASE1"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FATORB1"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VARIAC"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASEISS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FILIAL"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALISS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALFAT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CONTSOC"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BRICMS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FRETAUT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ICMAUTO"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DESPESA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NEXTDOC"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NEXTSER"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ESPECIE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_PDV"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_MAPA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ECF"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_PREFIXO"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASIMP1"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASIMP2"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASIMP3"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASIMP4"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASIMP5"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASIMP6"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALIMP1"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALIMP2"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALIMP3"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALIMP4"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALIMP5"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALIMP6"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ORDPAGO"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NFCUPOM"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALINSS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_HORA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_MOEDA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_REGIAO"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALCSLL"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALCOFI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALPIS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_LOTE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TXMOEDA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALIRRF"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_RECFAUT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CARGA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SEQCAR"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASEINS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_PEDPEND"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DESCCAB"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DTENTR"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FORMUL"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TIPODOC"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NFEACRS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TIPOREM"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SEQENT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ICMSDIF"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALACRS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_RECISS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_HAWB"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VEICUL1"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VEICUL2"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASEPS3"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALPS3"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASECF3"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALCF3"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NFELETR"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_EMINFE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_HORNFE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CODNFE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CREDNFE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TIPORET"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ESTCRED"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASEIRR"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DIACTB"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CHVNFE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NODIA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FLAGDEV"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CGCCLI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TPFRETE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASPIS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALTST"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DTDIGIT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VEICUL3"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VLR_FRT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CLIENT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_LOJENT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALFDS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_REFTAXA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_REFMOED"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NFICMST"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_PREFORI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASCOFI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASCSLL"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASETST"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASEFUN"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_RECOPI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NFSUBST"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SERSUBS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALFAB"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALFAC"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALFET"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VLSENAR"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NTFECP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALINA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASEINA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DESCZFR"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FILDEST"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TPNFEXP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CLEOK"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_EVENFLG"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CHVCLE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_IDCCE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_IDCLE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VREINT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BSREIN"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TOTIMP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TIPIMP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_IDRECOP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TOTFED"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TOTEST"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TOTMUN"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_MENNOTA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VLCPM"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASECPM"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALFMP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASEFMP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALFMD"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FLAGRGS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_IDRGS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CODRGS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DAUTNFE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_HAUTNFE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SERMDF"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NUMMDF"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_GNRFECP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_GNRDIF"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DTESERV"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALFUND"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALIMA"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_VALFASE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CLIRET"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_LOJARET"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FORMDES"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NUMORC"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ORDSEP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_IDSA1"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_IDSA2"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_IDSED"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_STATUS"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TPCOMPL"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_LTRAN"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SERSAT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CNO"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DTTXREF"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TXREF"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FORDES"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_LOJADES"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SDOCSUB"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SDOCMAN"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SDOCORI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SDOCMDF"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SDOCNXT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_SDOC"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BSFCCMP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BASFECP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_BSFCPST"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_MUNPRES"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_ESTPRES"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_FRTCFOP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_IDNF"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_PAFMD5"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CMUNOR"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_UFDEST"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CMUNDE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_UFORIG"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CLIREM"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_LOJAREM"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CODA1U"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NOME"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_DTRANSP"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_NPVEN"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_CODRAST"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_TRASTRE"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_RASTREI"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_LOGRAST"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_MSUIDT"
+        },
+        {
+          "tableName": "SF2010",
+          "columnName": "F2_GOVOPER"
+        }
+      ]
+    },
+    "fiscal_all": {
+      "sql": "SELECT 'SD1' source,COUNT_BIG(*) items FROM [dbo].[SD1010] WHERE D_E_L_E_T_='' AND D1_FILIAL='04' AND D1_LOCAL='10' UNION ALL SELECT 'SD2',COUNT_BIG(*) FROM [dbo].[SD2010] WHERE D_E_L_E_T_='' AND D2_FILIAL='04' AND D2_LOCAL='10'",
+      "params": [],
+      "rows": [
+        {
+          "source": "SD1",
+          "items": 2431
+        },
+        {
+          "source": "SD2",
+          "items": 29619
+        }
+      ]
+    },
+    "posting_order_warehouses": {
+      "sql": "SELECT c.C2_LOCAL orderWarehouse,COUNT_BIG(*) postings FROM [dbo].[SD3010] d LEFT JOIN [dbo].[SC2010] c ON c.D_E_L_E_T_='' AND c.C2_FILIAL=d.D3_FILIAL AND c.C2_NUM+c.C2_ITEM+c.C2_SEQUEN=d.D3_OP WHERE d.D_E_L_E_T_='' AND d.D3_FILIAL='04' AND d.D3_LOCAL='10' AND d.D3_CF='PR0' AND d.D3_ESTORNO<>'S' AND d.D3_EMISSAO BETWEEN '20260624' AND '20260924' GROUP BY c.C2_LOCAL",
+      "params": [],
+      "rows": [
+        {
+          "orderWarehouse": "05",
+          "postings": 158
+        },
+        {
+          "orderWarehouse": "10",
+          "postings": 608
+        }
+      ]
+    },
+    "tracking_recent": {
+      "sql": "SELECT f.F2_RASTREI enabled,f.F2_TRASTRE trackingType,COUNT_BIG(*) notes,SUM(CASE WHEN f.F2_CODRAST<>'' THEN 1 ELSE 0 END) withTracking,SUM(CASE WHEN f.F2_LOGRAST<>'' THEN 1 ELSE 0 END) withLog,SUM(CASE WHEN f.F2_TRANSP<>'' THEN 1 ELSE 0 END) withCarrier FROM [dbo].[SF2010] f WHERE f.D_E_L_E_T_='' AND f.F2_FILIAL='04' AND EXISTS(SELECT 1 FROM [dbo].[SD2010] d WHERE d.D_E_L_E_T_='' AND d.D2_FILIAL=f.F2_FILIAL AND d.D2_DOC=f.F2_DOC AND d.D2_SERIE=f.F2_SERIE AND d.D2_CLIENTE=f.F2_CLIENTE AND d.D2_LOJA=f.F2_LOJA AND d.D2_TIPO=f.F2_TIPO AND d.D2_LOCAL='10') AND f.F2_EMISSAO BETWEEN '20260624' AND '20260924' GROUP BY f.F2_RASTREI,f.F2_TRASTRE",
+      "params": [],
+      "rows": [
+        {
+          "enabled": "",
+          "trackingType": "",
+          "notes": 108,
+          "withTracking": 0,
+          "withLog": 0,
+          "withCarrier": 105
+        },
+        {
+          "enabled": "S",
+          "trackingType": "CR",
+          "notes": 259,
+          "withTracking": 0,
+          "withLog": 0,
+          "withCarrier": 259
+        },
+        {
+          "enabled": "S",
+          "trackingType": "NF",
+          "notes": 118,
+          "withTracking": 0,
+          "withLog": 0,
+          "withCarrier": 118
+        }
+      ]
+    },
+    "tracking_all": {
+      "sql": "SELECT COUNT_BIG(*) notes,SUM(CASE WHEN f.F2_CODRAST<>'' THEN 1 ELSE 0 END) withTracking,SUM(CASE WHEN f.F2_LOGRAST<>'' THEN 1 ELSE 0 END) withLog,MAX(f.F2_EMISSAO) latestDate FROM [dbo].[SF2010] f WHERE f.D_E_L_E_T_='' AND f.F2_FILIAL='04' AND EXISTS(SELECT 1 FROM [dbo].[SD2010] d WHERE d.D_E_L_E_T_='' AND d.D2_FILIAL=f.F2_FILIAL AND d.D2_DOC=f.F2_DOC AND d.D2_SERIE=f.F2_SERIE AND d.D2_CLIENTE=f.F2_CLIENTE AND d.D2_LOJA=f.F2_LOJA AND d.D2_TIPO=f.F2_TIPO AND d.D2_LOCAL='10')",
+      "params": [],
+      "rows": [
+        {
+          "notes": 8934,
+          "withTracking": 4,
+          "withLog": 4,
+          "latestDate": "20260918"
+        }
+      ]
+    },
+    "fiscal_unique_headers": {
+      "sql": "SELECT COUNT_BIG(*) duplicateKeys FROM (SELECT f.F2_FILIAL,f.F2_DOC,f.F2_SERIE,f.F2_CLIENTE,f.F2_LOJA,f.F2_TIPO FROM [dbo].[SF2010] f WHERE f.D_E_L_E_T_='' AND f.F2_FILIAL='04' AND EXISTS(SELECT 1 FROM [dbo].[SD2010] d WHERE d.D_E_L_E_T_='' AND d.D2_FILIAL=f.F2_FILIAL AND d.D2_DOC=f.F2_DOC AND d.D2_SERIE=f.F2_SERIE AND d.D2_CLIENTE=f.F2_CLIENTE AND d.D2_LOJA=f.F2_LOJA AND d.D2_TIPO=f.F2_TIPO AND d.D2_LOCAL='10') GROUP BY f.F2_FILIAL,f.F2_DOC,f.F2_SERIE,f.F2_CLIENTE,f.F2_LOJA,f.F2_TIPO HAVING COUNT_BIG(*)>1) q",
+      "params": [],
+      "rows": [
+        {
+          "duplicateKeys": 0
+        }
+      ]
+    }
+  },
+  "httpVerification": [
+    {
+      "view": "overview",
+      "total": 93412,
+      "returned": 8,
+      "latest": "20260918"
+    },
+    {
+      "view": "history",
+      "total": 93412,
+      "returned": 20,
+      "latest": "20260918"
+    },
+    {
+      "view": "stock",
+      "total": 2183,
+      "returned": 20,
+      "latest": "20260918"
+    },
+    {
+      "view": "orders",
+      "total": 6757,
+      "returned": 20,
+      "latest": "20260918"
+    },
+    {
+      "view": "inventory",
+      "total": 6076,
+      "returned": 20,
+      "latest": "20260918"
+    },
+    {
+      "view": "recent fiscal",
+      "total": 1664
+    },
+    {
+      "shippingDetail": "passed",
+      "headerStatus": "found",
+      "hasSalesOrder": true,
+      "hasCarrier": true,
+      "hasTracking": false
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "pdf.min.mjs": {
+    "url": "https://unpkg.com/pdfjs-dist@6.2.108/build/pdf.min.mjs",
+    "sha256": "e0be3863c23c8af2305b16548febd58e7f8874a460253317d7771cddbc1c0f6d",
+    "bytes": 454669
+  },
+  "pdf.worker.min.mjs": {
+    "url": "https://unpkg.com/pdfjs-dist@6.2.108/build/pdf.worker.min.mjs",
+    "sha256": "0613f41490dd6aaceed7a93fbbd38c85e6d6aa60474b6588c6e7709cfbe18cb3",
+    "bytes": 1262398
+  },
+  "LICENSE": {
+    "url": "https://unpkg.com/pdfjs-dist@6.2.108/LICENSE",
+    "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+    "bytes": 10174
+  }
+}

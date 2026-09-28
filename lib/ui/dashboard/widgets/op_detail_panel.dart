@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/data/models/ordem_producao.dart';
+import 'package:vetti_flow_1_0/data/models/protheus_completion_preview.dart';
+import 'package:vetti_flow_1_0/data/models/protheus_op_movements.dart';
+import 'package:vetti_flow_1_0/data/models/protheus_transfers.dart';
 import 'package:vetti_flow_1_0/data/models/production_flow.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_completion_preview_repository.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_op_movement_repository.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_transfer_repository.dart';
 import 'package:vetti_flow_1_0/data/models/responsavel.dart';
 import 'package:vetti_flow_1_0/shared/models/warehouse_routing.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
@@ -257,6 +264,14 @@ class _DetailContent extends StatelessWidget {
                     children: [
                       _InfoCard(op: op, resp: resp),
                       SizedBox(height: showBackArrow ? 18 : 24),
+                      _RoutingCard(op: op),
+                      SizedBox(height: showBackArrow ? 18 : 24),
+                      _OfficialMovementsCard(op: op),
+                      SizedBox(height: showBackArrow ? 18 : 24),
+                      _CompletionPreviewCard(op: op),
+                      SizedBox(height: showBackArrow ? 18 : 24),
+                      _OfficialTransfersCard(op: op),
+                      SizedBox(height: showBackArrow ? 18 : 24),
                       _StagesCard(
                         op: op,
                         canEdit: panel.canEdit,
@@ -309,6 +324,695 @@ class _DetailContent extends StatelessWidget {
       ],
     );
   }
+}
+
+class _OfficialMovementsCard extends StatefulWidget {
+  const _OfficialMovementsCard({required this.op});
+
+  final OrdemProducao op;
+
+  @override
+  State<_OfficialMovementsCard> createState() => _OfficialMovementsCardState();
+}
+
+class _OfficialMovementsCardState extends State<_OfficialMovementsCard> {
+  Future<ProtheusOpSnapshot>? _future;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _future ??= context.read<ProtheusOpMovementRepository?>()?.fetchSnapshot(
+      widget.op.numero,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final future = _future;
+    if (future == null) return const SizedBox.shrink();
+
+    return FutureBuilder<ProtheusOpSnapshot>(
+      future: future,
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: _SectionLabel('MOVIMENTOS OFICIAIS PROTHEUS'),
+                  ),
+                  _AuditChip(label: 'Somente leitura'),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (snapshot.connectionState != ConnectionState.done)
+                const Text(
+                  'Consultando SC2, SD4 e SD3...',
+                  style: TextStyle(fontSize: 12.5, color: AppColors.muted),
+                )
+              else if (snapshot.hasError)
+                Text(
+                  'Nao foi possivel ler movimentos oficiais: ${snapshot.error}',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.danger,
+                  ),
+                )
+              else if (data == null || data.movimentos.isEmpty)
+                Text(
+                  data == null
+                      ? 'Sem retorno oficial do Protheus.'
+                      : 'Sem movimentos SD3 oficiais para esta OP. Status oficial: ${data.statusLabel}.',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.muted,
+                  ),
+                )
+              else ...[
+                Text(
+                  'Status oficial: ${data.statusLabel}',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textStrong,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                _OfficialTotals(snapshot: data),
+                if (_localDivergence(data) != null) ...[
+                  const SizedBox(height: 8),
+                  _OfficialWarning(text: _localDivergence(data)!),
+                ],
+                if (_finishedGoodsDivergence(data) != null) ...[
+                  const SizedBox(height: 8),
+                  _OfficialWarning(text: _finishedGoodsDivergence(data)!),
+                ],
+                for (final warning in data.divergencias) ...[
+                  const SizedBox(height: 8),
+                  _OfficialWarning(text: warning),
+                ],
+                const SizedBox(height: 10),
+                for (var i = 0; i < data.movimentos.length; i++) ...[
+                  _OfficialMovementRow(movement: data.movimentos[i]),
+                  if (i < data.movimentos.length - 1)
+                    const Divider(height: 18, color: AppColors.borderLight),
+                ],
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String? _localDivergence(ProtheusOpSnapshot snapshot) {
+    final localVetti = widget.op.armazem.trim();
+    final localProtheus = snapshot.ordem?.local.trim() ?? '';
+    if (localVetti.isEmpty || localProtheus.isEmpty) return null;
+    if (localVetti == localProtheus) return null;
+    return 'Local VettiFlow $localVetti difere do local oficial SC2 $localProtheus.';
+  }
+
+  String? _finishedGoodsDivergence(ProtheusOpSnapshot snapshot) {
+    final localSugerido = widget.op.localEntradaAcabado.trim();
+    if (localSugerido.isEmpty) return null;
+    var localOficial = '';
+    for (final movement in snapshot.movimentos) {
+      if (movement.cf == 'PR0' && !movement.estorno) {
+        localOficial = movement.local.trim();
+        break;
+      }
+    }
+    if (localOficial.isEmpty) return null;
+    if (WarehouseRouting.normalizeCode(localSugerido) ==
+        WarehouseRouting.normalizeCode(localOficial)) {
+      return null;
+    }
+    return 'Entrada do acabado sugerida ${WarehouseRouting.normalizeCode(localSugerido)} difere do PR0 oficial ${WarehouseRouting.normalizeCode(localOficial)}.';
+  }
+}
+
+class _RoutingCard extends StatelessWidget {
+  const _RoutingCard({required this.op});
+
+  final OrdemProducao op;
+
+  @override
+  Widget build(BuildContext context) {
+    final orderWarehouse = _warehouseOrDash(op.armazem);
+    final consumptionWarehouse = _warehouseOrDash(op.localConsumoComponentes);
+    final finishedWarehouse = _warehouseOrDash(op.localEntradaAcabado);
+    final blocked = op.localEntradaAcabado.trim().isEmpty;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: _SectionLabel('ROTEAMENTO DE LOCAIS')),
+              _AuditChip(label: blocked ? 'Bloqueia conclusao' : 'Validado'),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 7,
+            runSpacing: 6,
+            children: [
+              _AuditChip(label: 'OP $orderWarehouse'),
+              _AuditChip(label: 'Consumo $consumptionWarehouse'),
+              _AuditChip(label: 'Acabado $finishedWarehouse'),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            blocked
+                ? 'Destino do acabado incerto. A expedição local fica bloqueada ate comparar com o historico Protheus.'
+                : _routingSummary(op),
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: blocked ? AppColors.danger : AppColors.textStrong,
+            ),
+          ),
+          for (final warning in op.roteamentoAvisos) ...[
+            const SizedBox(height: 8),
+            _OfficialWarning(text: warning),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static String _warehouseOrDash(String value) {
+    final code = value.trim();
+    if (code.isEmpty) return '—';
+    return WarehouseRouting.normalizeCode(code);
+  }
+
+  static String _routingSummary(OrdemProducao op) {
+    final orderWarehouse = WarehouseRouting.normalizeCode(op.armazem);
+    final finishedWarehouse = WarehouseRouting.normalizeCode(
+      op.localEntradaAcabado,
+    );
+    if (orderWarehouse == '05' && finishedWarehouse == '10') {
+      return 'Regra historica 05 -> 10: OP e consumo ficam na producao; entrada do acabado vai para expedicao.';
+    }
+    if (orderWarehouse == finishedWarehouse) {
+      return 'Entrada do acabado no mesmo local da OP.';
+    }
+    return 'Entrada do acabado em local diferente da OP conforme historico mapeado.';
+  }
+}
+
+class _CompletionPreviewCard extends StatefulWidget {
+  const _CompletionPreviewCard({required this.op});
+
+  final OrdemProducao op;
+
+  @override
+  State<_CompletionPreviewCard> createState() => _CompletionPreviewCardState();
+}
+
+class _CompletionPreviewCardState extends State<_CompletionPreviewCard> {
+  Future<ProtheusCompletionPreviewSnapshot>? _future;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _future ??= context
+        .read<ProtheusCompletionPreviewRepository?>()
+        ?.fetchPreview(widget.op.numero, quantidade: widget.op.qtd);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final future = _future;
+    if (future == null) return const SizedBox.shrink();
+
+    return FutureBuilder<ProtheusCompletionPreviewSnapshot>(
+      future: future,
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: _SectionLabel('PREVIA DE APONTAMENTO PROTHEUS'),
+                  ),
+                  _AuditChip(label: 'Somente leitura'),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (snapshot.connectionState != ConnectionState.done)
+                const Text(
+                  'Simulando PR0 e RE1...',
+                  style: TextStyle(fontSize: 12.5, color: AppColors.muted),
+                )
+              else if (snapshot.hasError)
+                Text(
+                  'Nao foi possivel simular apontamento: ${snapshot.error}',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.danger,
+                  ),
+                )
+              else if (data == null || data.movimentosPrevistos.isEmpty)
+                const Text(
+                  'Sem dados oficiais suficientes para simular apontamento.',
+                  style: TextStyle(fontSize: 12.5, color: AppColors.muted),
+                )
+              else ...[
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 6,
+                  children: [
+                    _AuditChip(label: 'Qtd ${_qty(data.quantidadeSolicitada)}'),
+                    _AuditChip(
+                      label: 'Restante ${_qty(data.quantidadeRestante)}',
+                    ),
+                    _AuditChip(label: data.rotinaStatus),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                for (final movement in data.movimentosPrevistos) ...[
+                  _CompletionPreviewMovementRow(movement: movement),
+                  const SizedBox(height: 8),
+                ],
+                for (final balance in data.saldosComponentes) ...[
+                  _CompletionBalanceRow(balance: balance),
+                  const SizedBox(height: 8),
+                ],
+                for (final warning in data.divergencias) ...[
+                  _OfficialWarning(text: warning),
+                  const SizedBox(height: 8),
+                ],
+                for (final pending in data.pendenciasPesquisa) ...[
+                  _OfficialWarning(text: pending),
+                  const SizedBox(height: 8),
+                ],
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CompletionPreviewMovementRow extends StatelessWidget {
+  const _CompletionPreviewMovementRow({required this.movement});
+
+  final ProtheusCompletionMovementPreview movement;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 48,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Text(
+            movement.label,
+            style: GoogleFonts.ibmPlexMono(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+              color: AppColors.primary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${movement.kindLabel} · ${movement.produto}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textStrong,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 7,
+                runSpacing: 5,
+                children: [
+                  _AuditChip(label: '${_qty(movement.quantidade)} un'),
+                  _AuditChip(label: 'Local ${movement.local}'),
+                  if (movement.documentoReferencia.isNotEmpty)
+                    _AuditChip(label: 'Doc ${movement.documentoReferencia}'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CompletionBalanceRow extends StatelessWidget {
+  const _CompletionBalanceRow({required this.balance});
+
+  final ProtheusCompletionComponentBalance balance;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = balance.suficiente ? AppColors.green : AppColors.orangeText;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Text(
+        'Saldo ${balance.produto} local ${balance.local}: ${_qty(balance.saldoAtual)} disponivel / ${_qty(balance.quantidadePrevista)} previsto',
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w800,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _OfficialTransfersCard extends StatefulWidget {
+  const _OfficialTransfersCard({required this.op});
+
+  final OrdemProducao op;
+
+  @override
+  State<_OfficialTransfersCard> createState() => _OfficialTransfersCardState();
+}
+
+class _OfficialTransfersCardState extends State<_OfficialTransfersCard> {
+  Future<ProtheusTransferSnapshot>? _future;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _future ??= context.read<ProtheusTransferRepository?>()?.fetchTransfers(
+      produto: _productCode(widget.op.produto),
+      limit: 8,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final future = _future;
+    if (future == null) return const SizedBox.shrink();
+
+    return FutureBuilder<ProtheusTransferSnapshot>(
+      future: future,
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: _SectionLabel('TRANSFERENCIAS OFICIAIS PROTHEUS'),
+                  ),
+                  _AuditChip(label: 'Somente leitura'),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (snapshot.connectionState != ConnectionState.done)
+                const Text(
+                  'Consultando RE4 e DE4...',
+                  style: TextStyle(fontSize: 12.5, color: AppColors.muted),
+                )
+              else if (snapshot.hasError)
+                Text(
+                  'Nao foi possivel ler transferencias oficiais: ${snapshot.error}',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.danger,
+                  ),
+                )
+              else if (data == null || data.transferencias.isEmpty)
+                const Text(
+                  'Sem transferencias oficiais RE4/DE4 para este produto.',
+                  style: TextStyle(fontSize: 12.5, color: AppColors.muted),
+                )
+              else ...[
+                for (final warning in data.divergencias) ...[
+                  _OfficialWarning(text: warning),
+                  const SizedBox(height: 8),
+                ],
+                for (var i = 0; i < data.transferencias.length; i++) ...[
+                  _OfficialTransferRow(transfer: data.transferencias[i]),
+                  if (i < data.transferencias.length - 1)
+                    const Divider(height: 18, color: AppColors.borderLight),
+                ],
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  static String _productCode(String produto) {
+    return produto.split(' - ').first.trim();
+  }
+}
+
+class _OfficialTransferRow extends StatelessWidget {
+  const _OfficialTransferRow({required this.transfer});
+
+  final ProtheusTransfer transfer;
+
+  @override
+  Widget build(BuildContext context) {
+    final incomplete = transfer.status != 'pareada';
+    final color = incomplete ? AppColors.orangeText : AppColors.primary;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 64,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Text(
+            transfer.routeLabel,
+            style: GoogleFonts.ibmPlexMono(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+              color: color,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${transfer.produto} · ${transfer.statusLabel}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textStrong,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 7,
+                runSpacing: 5,
+                children: [
+                  _AuditChip(label: '${_qty(transfer.quantidade)} un'),
+                  if (transfer.documento.isNotEmpty)
+                    _AuditChip(label: 'Doc ${transfer.documento}'),
+                  if (transfer.data.isNotEmpty)
+                    _AuditChip(label: transfer.data),
+                  for (final movement in transfer.movimentos)
+                    _AuditChip(label: movement.label),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OfficialTotals extends StatelessWidget {
+  const _OfficialTotals({required this.snapshot});
+
+  final ProtheusOpSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final ordem = snapshot.ordem;
+    return Wrap(
+      spacing: 7,
+      runSpacing: 6,
+      children: [
+        if (ordem != null) _AuditChip(label: 'SC2 local ${ordem.local}'),
+        _AuditChip(label: 'PR0 ${_qty(snapshot.totalProduzido)}'),
+        _AuditChip(label: 'RE1 ${_qty(snapshot.totalConsumido)}'),
+        if (snapshot.hasReversal) _AuditChip(label: 'Estorno detectado'),
+        _AuditChip(label: '${snapshot.empenhos.length} empenho(s) SD4'),
+      ],
+    );
+  }
+}
+
+class _OfficialWarning extends StatelessWidget {
+  const _OfficialWarning({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.bgHeader,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 11.5,
+          height: 1.3,
+          color: AppColors.textMuted,
+        ),
+      ),
+    );
+  }
+}
+
+class _OfficialMovementRow extends StatelessWidget {
+  const _OfficialMovementRow({required this.movement});
+
+  final ProtheusOpMovement movement;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = movement.estorno ? AppColors.danger : AppColors.primary;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 42,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Text(
+            movement.label,
+            style: GoogleFonts.ibmPlexMono(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+              color: color,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${movement.kindLabel} · ${movement.produto}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textStrong,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 7,
+                runSpacing: 5,
+                children: [
+                  _AuditChip(label: '${_qty(movement.quantidade)} un'),
+                  _AuditChip(label: 'Local ${movement.local}'),
+                  if (movement.documento.isNotEmpty)
+                    _AuditChip(label: 'Doc ${movement.documento}'),
+                  if (movement.numSeq.isNotEmpty)
+                    _AuditChip(label: 'Seq ${movement.numSeq}'),
+                  if (movement.perda != 0)
+                    _AuditChip(label: 'Perda ${_qty(movement.perda)}'),
+                  if (movement.ganho != 0)
+                    _AuditChip(label: 'Ganho ${_qty(movement.ganho)}'),
+                  if (movement.estorno) const _AuditChip(label: 'Estorno'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _qty(num value) {
+  if (value == value.roundToDouble()) return value.toInt().toString();
+  return value.toStringAsFixed(2).replaceAll('.', ',');
 }
 
 class _InfoCard extends StatelessWidget {

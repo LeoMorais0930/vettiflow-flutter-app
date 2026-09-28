@@ -1,0 +1,626 @@
+{
+  "parametros": [
+    {
+      "filial": "",
+      "parametro": "MV_AGCUSTO",
+      "valor": ".F."
+    },
+    {
+      "filial": "01",
+      "parametro": "MV_ALMTERC",
+      "valor": ""
+    },
+    {
+      "filial": "02",
+      "parametro": "MV_ALMTERC",
+      "valor": ""
+    },
+    {
+      "filial": "03",
+      "parametro": "MV_ALMTERC",
+      "valor": ""
+    },
+    {
+      "filial": "04",
+      "parametro": "MV_ALMTERC",
+      "valor": ""
+    },
+    {
+      "filial": "05",
+      "parametro": "MV_ALMTERC",
+      "valor": ""
+    },
+    {
+      "filial": "90",
+      "parametro": "MV_ALMTERC",
+      "valor": ""
+    },
+    {
+      "filial": "01",
+      "parametro": "MV_CONTERC",
+      "valor": "F"
+    },
+    {
+      "filial": "02",
+      "parametro": "MV_CONTERC",
+      "valor": "F"
+    },
+    {
+      "filial": "03",
+      "parametro": "MV_CONTERC",
+      "valor": "F"
+    },
+    {
+      "filial": "04",
+      "parametro": "MV_CONTERC",
+      "valor": "F"
+    },
+    {
+      "filial": "05",
+      "parametro": "MV_CONTERC",
+      "valor": "F"
+    },
+    {
+      "filial": "90",
+      "parametro": "MV_CONTERC",
+      "valor": "F"
+    },
+    {
+      "filial": "01",
+      "parametro": "MV_CUSFIL",
+      "valor": "A"
+    },
+    {
+      "filial": "02",
+      "parametro": "MV_CUSFIL",
+      "valor": "A"
+    },
+    {
+      "filial": "03",
+      "parametro": "MV_CUSFIL",
+      "valor": "A"
+    },
+    {
+      "filial": "04",
+      "parametro": "MV_CUSFIL",
+      "valor": "A"
+    },
+    {
+      "filial": "05",
+      "parametro": "MV_CUSFIL",
+      "valor": "A"
+    },
+    {
+      "filial": "90",
+      "parametro": "MV_CUSFIL",
+      "valor": "A"
+    },
+    {
+      "filial": "01",
+      "parametro": "MV_CUSMED",
+      "valor": "M"
+    },
+    {
+      "filial": "02",
+      "parametro": "MV_CUSMED",
+      "valor": "M"
+    },
+    {
+      "filial": "03",
+      "parametro": "MV_CUSMED",
+      "valor": "M"
+    },
+    {
+      "filial": "04",
+      "parametro": "MV_CUSMED",
+      "valor": "M"
+    },
+    {
+      "filial": "05",
+      "parametro": "MV_CUSMED",
+      "valor": "M"
+    },
+    {
+      "filial": "90",
+      "parametro": "MV_CUSMED",
+      "valor": "M"
+    },
+    {
+      "filial": "01",
+      "parametro": "MV_DBLQMOV",
+      "valor": "19970101"
+    },
+    {
+      "filial": "02",
+      "parametro": "MV_DBLQMOV",
+      "valor": "19970101"
+    },
+    {
+      "filial": "03",
+      "parametro": "MV_DBLQMOV",
+      "valor": "19970101"
+    },
+    {
+      "filial": "04",
+      "parametro": "MV_DBLQMOV",
+      "valor": ""
+    },
+    {
+      "filial": "05",
+      "parametro": "MV_DBLQMOV",
+      "valor": "19970101"
+    },
+    {
+      "filial": "90",
+      "parametro": "MV_DBLQMOV",
+      "valor": "19970101"
+    },
+    {
+      "filial": "01",
+      "parametro": "MV_ESTNEG",
+      "valor": "N"
+    },
+    {
+      "filial": "02",
+      "parametro": "MV_ESTNEG",
+      "valor": "S"
+    },
+    {
+      "filial": "03",
+      "parametro": "MV_ESTNEG",
+      "valor": "S"
+    },
+    {
+      "filial": "04",
+      "parametro": "MV_ESTNEG",
+      "valor": "N"
+    },
+    {
+      "filial": "05",
+      "parametro": "MV_ESTNEG",
+      "valor": "S"
+    },
+    {
+      "filial": "90",
+      "parametro": "MV_ESTNEG",
+      "valor": "S"
+    },
+    {
+      "filial": "01",
+      "parametro": "MV_EXPLOPU",
+      "valor": "N"
+    },
+    {
+      "filial": "02",
+      "parametro": "MV_EXPLOPU",
+      "valor": "N"
+    },
+    {
+      "filial": "03",
+      "parametro": "MV_EXPLOPU",
+      "valor": "N"
+    },
+    {
+      "filial": "04",
+      "parametro": "MV_EXPLOPU",
+      "valor": "S"
+    },
+    {
+      "filial": "05",
+      "parametro": "MV_EXPLOPU",
+      "valor": "N"
+    },
+    {
+      "filial": "90",
+      "parametro": "MV_EXPLOPU",
+      "valor": "N"
+    },
+    {
+      "filial": "01",
+      "parametro": "MV_LOTVENC",
+      "valor": "S"
+    },
+    {
+      "filial": "02",
+      "parametro": "MV_LOTVENC",
+      "valor": "S"
+    },
+    {
+      "filial": "03",
+      "parametro": "MV_LOTVENC",
+      "valor": "S"
+    },
+    {
+      "filial": "04",
+      "parametro": "MV_LOTVENC",
+      "valor": "S"
+    },
+    {
+      "filial": "05",
+      "parametro": "MV_LOTVENC",
+      "valor": "S"
+    },
+    {
+      "filial": "90",
+      "parametro": "MV_LOTVENC",
+      "valor": "S"
+    },
+    {
+      "filial": "01",
+      "parametro": "MV_NEGESTR",
+      "valor": "F"
+    },
+    {
+      "filial": "02",
+      "parametro": "MV_NEGESTR",
+      "valor": "F"
+    },
+    {
+      "filial": "03",
+      "parametro": "MV_NEGESTR",
+      "valor": "F"
+    },
+    {
+      "filial": "04",
+      "parametro": "MV_NEGESTR",
+      "valor": "F"
+    },
+    {
+      "filial": "05",
+      "parametro": "MV_NEGESTR",
+      "valor": "F"
+    },
+    {
+      "filial": "90",
+      "parametro": "MV_NEGESTR",
+      "valor": "F"
+    },
+    {
+      "filial": "01",
+      "parametro": "MV_REQAUT",
+      "valor": "A"
+    },
+    {
+      "filial": "02",
+      "parametro": "MV_REQAUT",
+      "valor": "A"
+    },
+    {
+      "filial": "03",
+      "parametro": "MV_REQAUT",
+      "valor": "A"
+    },
+    {
+      "filial": "04",
+      "parametro": "MV_REQAUT",
+      "valor": "A"
+    },
+    {
+      "filial": "05",
+      "parametro": "MV_REQAUT",
+      "valor": "A"
+    },
+    {
+      "filial": "90",
+      "parametro": "MV_REQAUT",
+      "valor": "A"
+    }
+  ],
+  "dicionario": [
+    {
+      "campo": "D3_COD",
+      "tamanho": 30.0,
+      "decimais": 0.0,
+      "validacao": "A093Prod().And.A241PrdGrd().And. A241VLDFan(M->D3_COD)"
+    },
+    {
+      "campo": "D3_DOC",
+      "tamanho": 9.0,
+      "decimais": 0.0,
+      "validacao": "A240Doc()"
+    },
+    {
+      "campo": "D3_LOCAL",
+      "tamanho": 2.0,
+      "decimais": 0.0,
+      "validacao": "ExistCpo(\"NNR\") .And. A240Local()"
+    },
+    {
+      "campo": "D3_OP",
+      "tamanho": 14.0,
+      "decimais": 0.0,
+      "validacao": "vazio() .Or. A250IniOP()"
+    },
+    {
+      "campo": "D3_PERDA",
+      "tamanho": 11.0,
+      "decimais": 2.0,
+      "validacao": "Positivo() .And. AQtdPerda(\"A250\") .And. DigiPerda(M->D3_COD,M->D3_OP,M->D3_PERDA)"
+    },
+    {
+      "campo": "D3_QTGANHO",
+      "tamanho": 12.0,
+      "decimais": 2.0,
+      "validacao": ""
+    },
+    {
+      "campo": "D3_QUANT",
+      "tamanho": 14.0,
+      "decimais": 2.0,
+      "validacao": "A240Quant()"
+    },
+    {
+      "campo": "D3_RATEIO",
+      "tamanho": 6.0,
+      "decimais": 2.0,
+      "validacao": "M->D3_RATEIO > 0"
+    }
+  ],
+  "locais_sh6": [
+    {
+      "TABLE_SCHEMA": "dbo",
+      "TABLE_NAME": "SH6010_TTAT_LOG"
+    }
+  ],
+  "rateios": [
+    {
+      "documento": "Q000003YV",
+      "sequencia": "410429",
+      "cf": "DE7",
+      "produto": "100-010",
+      "local": "05",
+      "quantidade": 227.0,
+      "rateio": 0.25,
+      "custo": 16.577077,
+      "data": "20260629"
+    },
+    {
+      "documento": "Q000003YV",
+      "sequencia": "410429",
+      "cf": "DE7",
+      "produto": "106-010",
+      "local": "05",
+      "quantidade": 454.0,
+      "rateio": 3.02,
+      "custo": 200.251086,
+      "data": "20260629"
+    },
+    {
+      "documento": "Q000003YV",
+      "sequencia": "410429",
+      "cf": "DE7",
+      "produto": "203-010",
+      "local": "05",
+      "quantidade": 227.0,
+      "rateio": 15.06,
+      "custo": 998.6031,
+      "data": "20260629"
+    },
+    {
+      "documento": "Q000003YV",
+      "sequencia": "410429",
+      "cf": "DE7",
+      "produto": "464-000",
+      "local": "05",
+      "quantidade": 454.0,
+      "rateio": 0.35,
+      "custo": 23.207907,
+      "data": "20260629"
+    },
+    {
+      "documento": "Q000003YV",
+      "sequencia": "410429",
+      "cf": "DE7",
+      "produto": "464-059",
+      "local": "05",
+      "quantidade": 227.0,
+      "rateio": 9.23,
+      "custo": 612.025671,
+      "data": "20260629"
+    },
+    {
+      "documento": "Q000003YV",
+      "sequencia": "410429",
+      "cf": "DE7",
+      "produto": "550-0888",
+      "local": "05",
+      "quantidade": 227.0,
+      "rateio": 69.95,
+      "custo": 4638.266057,
+      "data": "20260629"
+    },
+    {
+      "documento": "Q000003YV",
+      "sequencia": "410429",
+      "cf": "DE7",
+      "produto": "MOD08010201005",
+      "local": "05",
+      "quantidade": 0.51,
+      "rateio": 1.99,
+      "custo": 131.95353,
+      "data": "20260629"
+    },
+    {
+      "documento": "Q000003YV",
+      "sequencia": "410429",
+      "cf": "DE7",
+      "produto": "MOD08010901002",
+      "local": "05",
+      "quantidade": 0.06,
+      "rateio": 0.15,
+      "custo": 9.946247,
+      "data": "20260629"
+    },
+    {
+      "documento": "Q000003YV",
+      "sequencia": "410429",
+      "cf": "RE7",
+      "produto": "575-0888",
+      "local": "10",
+      "quantidade": 227.0,
+      "rateio": 100.0,
+      "custo": 6630.830675,
+      "data": "20260629"
+    },
+    {
+      "documento": "Q000004AV",
+      "sequencia": "417255",
+      "cf": "DE7",
+      "produto": "103-087",
+      "local": "01",
+      "quantidade": 500.0,
+      "rateio": 22.61,
+      "custo": 79.001024,
+      "data": "20260903"
+    },
+    {
+      "documento": "Q000004AV",
+      "sequencia": "417255",
+      "cf": "DE7",
+      "produto": "200-179",
+      "local": "01",
+      "quantidade": 500.0,
+      "rateio": 53.89,
+      "custo": 188.295675,
+      "data": "20260903"
+    },
+    {
+      "documento": "Q000004AV",
+      "sequencia": "417255",
+      "cf": "DE7",
+      "produto": "MOD08010901002",
+      "local": "01",
+      "quantidade": 0.56,
+      "rateio": 23.5,
+      "custo": 82.110751,
+      "data": "20260903"
+    },
+    {
+      "documento": "Q000004AV",
+      "sequencia": "417255",
+      "cf": "RE7",
+      "produto": "203-058",
+      "local": "10",
+      "quantidade": 500.0,
+      "rateio": 100.0,
+      "custo": 349.40745,
+      "data": "20260903"
+    },
+    {
+      "documento": "Q000004C1",
+      "sequencia": "418223",
+      "cf": "DE7",
+      "produto": "100-010",
+      "local": "05",
+      "quantidade": 500.0,
+      "rateio": 50.0,
+      "custo": 2001.827126,
+      "data": "20260914"
+    },
+    {
+      "documento": "Q000004C1",
+      "sequencia": "418223",
+      "cf": "DE7",
+      "produto": "101-039",
+      "local": "01",
+      "quantidade": 500.0,
+      "rateio": 50.0,
+      "custo": 2001.827126,
+      "data": "20260914"
+    },
+    {
+      "documento": "Q000004C1",
+      "sequencia": "418223",
+      "cf": "RE7",
+      "produto": "575-0759",
+      "local": "05",
+      "quantidade": 500.0,
+      "rateio": 100.0,
+      "custo": 4003.654252,
+      "data": "20260914"
+    },
+    {
+      "documento": "Q000004C2",
+      "sequencia": "418224",
+      "cf": "DE7",
+      "produto": "101-041",
+      "local": "10",
+      "quantidade": 500.0,
+      "rateio": 50.0,
+      "custo": 2396.736655,
+      "data": "20260914"
+    },
+    {
+      "documento": "Q000004C2",
+      "sequencia": "418224",
+      "cf": "DE7",
+      "produto": "100-010",
+      "local": "10",
+      "quantidade": 500.0,
+      "rateio": 50.0,
+      "custo": 2396.736656,
+      "data": "20260914"
+    },
+    {
+      "documento": "Q000004C2",
+      "sequencia": "418224",
+      "cf": "RE7",
+      "produto": "575-0792",
+      "local": "10",
+      "quantidade": 500.0,
+      "rateio": 100.0,
+      "custo": 4793.473311,
+      "data": "20260914"
+    },
+    {
+      "documento": "Q000004C3",
+      "sequencia": "418225",
+      "cf": "DE7",
+      "produto": "101-052",
+      "local": "10",
+      "quantidade": 500.0,
+      "rateio": 33.33,
+      "custo": 1360.692147,
+      "data": "20260914"
+    },
+    {
+      "documento": "Q000004C3",
+      "sequencia": "418225",
+      "cf": "DE7",
+      "produto": "103-068",
+      "local": "10",
+      "quantidade": 500.0,
+      "rateio": 33.33,
+      "custo": 1360.692147,
+      "data": "20260914"
+    },
+    {
+      "documento": "Q000004C3",
+      "sequencia": "418225",
+      "cf": "DE7",
+      "produto": "100-010",
+      "local": "10",
+      "quantidade": 500.0,
+      "rateio": 33.34,
+      "custo": 1361.100395,
+      "data": "20260914"
+    },
+    {
+      "documento": "Q000004C3",
+      "sequencia": "418225",
+      "cf": "RE7",
+      "produto": "575-0792E",
+      "local": "10",
+      "quantidade": 500.0,
+      "rateio": 100.0,
+      "custo": 4082.484689,
+      "data": "20260914"
+    }
+  ],
+  "consultas": {
+    "parametros": "SELECT X6_FIL filial,X6_VAR parametro,X6_CONTEUD valor FROM dbo.SX6010 WHERE D_E_L_E_T_='' AND X6_VAR IN ('MV_AGCUSTO','MV_CUSFIL','MV_CUSMED','MV_ESTNEG','MV_NEGESTR','MV_DBLQMOV','MV_CONTERC','MV_ALMTERC','MV_EXPLOPU','MV_REQAUT','MV_REQAUT2','MV_LOTVENC') ORDER BY X6_VAR,X6_FIL",
+    "dicionario": "SELECT X3_CAMPO campo,X3_TAMANHO tamanho,X3_DECIMAL decimais,X3_VALID validacao FROM dbo.SX3010 WHERE D_E_L_E_T_='' AND X3_CAMPO IN ('D3_RATEIO','D3_QUANT','D3_DOC','D3_LOCAL','D3_OP','D3_COD','D3_PERDA','D3_QTGANHO') ORDER BY X3_CAMPO",
+    "locais_sh6": "SELECT TABLE_SCHEMA,TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME LIKE 'SH6%'",
+    "rateios": "SELECT D3_DOC documento,D3_NUMSEQ sequencia,D3_CF cf,D3_COD produto,D3_LOCAL local,D3_QUANT quantidade,D3_RATEIO rateio,D3_CUSTO1 custo,D3_EMISSAO data FROM dbo.SD3010 WHERE D_E_L_E_T_='' AND D3_FILIAL='04' AND D3_EMISSAO>='20260624' AND D3_EMISSAO<'20260925' AND D3_CF IN ('RE7','DE7') ORDER BY D3_EMISSAO,D3_DOC,D3_CF"
+  }
+}

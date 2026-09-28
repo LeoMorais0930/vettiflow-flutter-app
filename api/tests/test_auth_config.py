@@ -1,24 +1,15 @@
-from contextlib import contextmanager
-
 from fastapi.testclient import TestClient
 
-from app import config, db
+from app import config, mssql
 from app.main import app
 
 
-class FakeConn:
-    def execute(self, *_args, **_kwargs):
-        return None
-
-
-@contextmanager
-def fake_conexao():
-    yield FakeConn()
-
-
 def _client(monkeypatch):
-    monkeypatch.setattr(db, "preparar_banco", lambda: None)
-    monkeypatch.setattr(db, "conexao", fake_conexao)
+    monkeypatch.setattr(
+        mssql,
+        "health",
+        lambda: {"banco": "HMLp12", "servidor": "win-l1na6ce7lb4"},
+    )
     return TestClient(app)
 
 

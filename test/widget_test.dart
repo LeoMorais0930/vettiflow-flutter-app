@@ -1,4 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:vetti_flow_1_0/data/repositories/warehouse_read_repository.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,7 +17,6 @@ import 'package:vetti_flow_1_0/data/repositories/op_repository.dart';
 import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
 import 'package:vetti_flow_1_0/data/repositories/production_flow_database.dart';
 import 'package:vetti_flow_1_0/data/repositories/production_flow_store.dart';
-import 'package:vetti_flow_1_0/data/repositories/protheus_connection_store.dart';
 import 'package:vetti_flow_1_0/data/repositories/warehouse_request_store.dart';
 import 'package:vetti_flow_1_0/shared/models/operator.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_theme.dart';
@@ -23,7 +26,6 @@ import 'package:vetti_flow_1_0/ui/dashboard/views/operator_assignments_view.dart
 import 'package:vetti_flow_1_0/ui/dashboard/views/reports_view.dart';
 import 'package:vetti_flow_1_0/ui/dashboard/widgets/nova_op_dialog.dart';
 import 'package:vetti_flow_1_0/ui/dashboard/widgets/op_detail_panel.dart';
-import 'package:vetti_flow_1_0/ui/auth/widgets/login_form_panel.dart';
 import 'package:vetti_flow_1_0/ui/smd/smd_page.dart';
 import 'package:vetti_flow_1_0/ui/shared/widgets/vetti_top_bar.dart';
 import 'package:vetti_flow_1_0/ui/warehouse/warehouse_page.dart';
@@ -784,7 +786,7 @@ void main() {
   });
 
   test('two apps on the same database never share an OP number', () async {
-    // O cenario real: duas maquinas apontando para o mesmo Postgres. Antes da
+    // O cenario real: duas maquinas apontando para o mesmo banco. Antes da
     // sequence cada app carregava seu proprio contador e os dois chegavam no
     // mesmo `OP-<ano>-N` — e o upsert do `saveOrder` sobrescrevia a OP de quem
     // gravou primeiro, em silencio.
@@ -819,25 +821,28 @@ void main() {
     expect(database.sequenceCalls, 3);
   });
 
-  test('OP number falls back to the local counter without a database', () async {
-    // Postgres fora do ar: `nextOrderSequence` devolve null e a OP ainda nasce,
-    // com numero local, para o app seguir funcionando offline.
-    final database = _RecordingProductionFlowDatabase();
-    final store = ProductionFlowStore(database: database);
+  test(
+    'OP number falls back to the local counter without a database',
+    () async {
+      // Banco fora do ar: `nextOrderSequence` devolve null e a OP ainda nasce,
+      // com numero local, para o app seguir funcionando offline.
+      final database = _RecordingProductionFlowDatabase();
+      final store = ProductionFlowStore(database: database);
 
-    final created = await store.createOrder(
-      productCode: '575-0845',
-      productName: 'SUB MEC SMART MODULO SIRENE SF',
-      quantity: 10,
-      priority: 'Media',
-      operatorName: 'Tatiane',
-      orderWarehouse: '05',
-    );
+      final created = await store.createOrder(
+        productCode: '575-0845',
+        productName: 'SUB MEC SMART MODULO SIRENE SF',
+        quantity: 10,
+        priority: 'Media',
+        operatorName: 'Tatiane',
+        orderWarehouse: '05',
+      );
 
-    expect(created.number, startsWith('OP-'));
-    expect(database.sequenceCalls, 1);
-    expect(database.savedOrders.single.number, created.number);
-  });
+      expect(created.number, startsWith('OP-'));
+      expect(database.sequenceCalls, 1);
+      expect(database.savedOrders.single.number, created.number);
+    },
+  );
 
   test(
     'cancel order sends stock return choices to the configured database',
@@ -901,31 +906,6 @@ void main() {
     expect(find.text('Entrar no sistema'), findsOneWidget);
     expect(find.byType(TextFormField), findsNWidgets(2));
     expect(find.text('Entrar'), findsOneWidget);
-  });
-
-  testWidgets('login exposes developer connection mode selector', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_testApp());
-
-    expect(find.text('Modo desenvolvedor'), findsOneWidget);
-
-    await tester.ensureVisible(find.text('Modo desenvolvedor'));
-    await tester.tap(find.text('Modo desenvolvedor'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Automático'), findsOneWidget);
-    expect(find.text('FastAPI'), findsOneWidget);
-    expect(find.text('Local Postgres'), findsOneWidget);
-
-    await tester.tap(find.text('Local Postgres'));
-    await tester.pumpAndSettle();
-
-    final context = tester.element(find.byType(LoginFormPanel));
-    expect(
-      context.read<ProtheusConnectionStore>().mode,
-      ProtheusConnectionMode.localPostgres,
-    );
   });
 
   testWidgets('navigates from login to firmware screen', (tester) async {
@@ -1263,88 +1243,60 @@ void main() {
     expect(find.text('Paula'), findsNothing);
   });
 
-  testWidgets('Paula sees SMD orders on the SMD pointing screen', (
-    tester,
-  ) async {
-    await _setViewport(tester, const Size(1366, 768));
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    final store = ProductionFlowStore(
-      seedOrders: [
-        ProductionOrderFlow(
-          number: 'OP-SMD-001',
-          productCode: '575-0845',
-          productName: 'SUB MEC SMART MODULO SIRENE SF',
-          quantity: 120,
-          currentStage: ProductionStage.smd,
-          status: ProductionRunStatus.waiting,
-          priority: 'Alta',
-          createdAt: DateTime(2026, 8, 4, 8),
-          updatedAt: DateTime(2026, 8, 4, 8),
+  for (final username in ['paula', 'leandro']) {
+    testWidgets('$username sees official SMD orders from the read API', (
+      tester,
+    ) async {
+      await _setViewport(tester, const Size(1366, 768));
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final user = Operator.all.firstWhere((o) => o.username == username);
+      final assignments = OperatorAssignmentStore()
+        ..authenticate(user.username, user.password);
+      final repository = WarehouseReadRepository(
+        baseUrl: 'http://api',
+        httpClient: MockClient((request) async {
+          expect(request.method, 'GET');
+          expect(request.url.queryParameters['local'], '03');
+          expect(request.url.queryParameters['view'], 'orders');
+          return http.Response(
+            jsonEncode({
+              'total': 1,
+              'items': [
+                {
+                  'id': 'SC2:1',
+                  'op': '01600101001',
+                  'code': '500-0001',
+                  'description': 'Placa SMD',
+                  'quantity': 120,
+                  'produced': 20,
+                  'unit': 'PC',
+                  'closed': 0,
+                  'date': '20260804',
+                },
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: assignments),
+            Provider.value(value: repository),
+          ],
+          child: MaterialApp(theme: AppTheme.light, home: const SmdPage()),
         ),
-      ],
-    );
-    final assignments = OperatorAssignmentStore()
-      ..authenticate('paula', '4001');
-
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<ProductionFlowStore>.value(value: store),
-          ChangeNotifierProvider<OperatorAssignmentStore>.value(
-            value: assignments,
-          ),
-        ],
-        child: MaterialApp(theme: AppTheme.light, home: const SmdPage()),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('OP-SMD-001'), findsWidgets);
-    expect(find.textContaining('Nenhuma OP aguardando SMD'), findsNothing);
-  });
-
-  testWidgets('Leandro sees SMD orders on the SMD pointing screen', (
-    tester,
-  ) async {
-    await _setViewport(tester, const Size(1366, 768));
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    final store = ProductionFlowStore(
-      seedOrders: [
-        ProductionOrderFlow(
-          number: 'OP-SMD-LEANDRO-001',
-          productCode: '575-0845',
-          productName: 'SUB MEC SMART MODULO SIRENE SF',
-          quantity: 120,
-          currentStage: ProductionStage.smd,
-          status: ProductionRunStatus.waiting,
-          priority: 'Alta',
-          createdAt: DateTime(2026, 8, 4, 8),
-          updatedAt: DateTime(2026, 8, 4, 8),
-        ),
-      ],
-    );
-    final assignments = OperatorAssignmentStore()
-      ..authenticate('leandro', '4002');
-
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<ProductionFlowStore>.value(value: store),
-          ChangeNotifierProvider<OperatorAssignmentStore>.value(
-            value: assignments,
-          ),
-        ],
-        child: MaterialApp(theme: AppTheme.light, home: const SmdPage()),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('OP-SMD-LEANDRO-001'), findsWidgets);
-  });
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('01600101001'), findsOneWidget);
+      expect(find.textContaining('Restante: 100'), findsOneWidget);
+      expect(find.text('Concluir apontamento'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      assignments.dispose();
+    });
+  }
 
   testWidgets('warehouse pointing screen does not offer OP creation', (
     tester,
@@ -1851,7 +1803,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(_testApp(initialRoute: '/expedicao'));
+    await tester.pumpWidget(_testApp(initialRoute: '/expedicao/fluxo-local'));
     await tester.pumpAndSettle();
 
     expect(find.text('Armazenadas'), findsOneWidget);
@@ -1891,10 +1843,14 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(_testApp(initialRoute: '/expedicao'));
+    await tester.pumpWidget(_testApp(initialRoute: '/expedicao/fluxo-local'));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Iniciar conferencia'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Iniciar conferencia'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Finalizar despacho'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Finalizar despacho'));
     await tester.pumpAndSettle();
@@ -1919,6 +1875,8 @@ void main() {
     await tester.tap(find.widgetWithText(OutlinedButton, 'Finalizar'));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Armazenadas'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Armazenadas'));
     await tester.pumpAndSettle();
 
@@ -2030,6 +1988,7 @@ List<ProductionOrderFlow> _demoOrders() {
       priority: 'Media',
       createdAt: now.subtract(const Duration(hours: 6)),
       updatedAt: now.subtract(const Duration(minutes: 2)),
+      orderWarehouse: '05',
     ),
     ProductionOrderFlow(
       number: 'OP-00563-992',
@@ -2055,9 +2014,6 @@ Widget _testApp({String initialRoute = '/login'}) {
       ),
       ChangeNotifierProvider<OperatorAssignmentStore>(
         create: (_) => OperatorAssignmentStore(),
-      ),
-      ChangeNotifierProvider<ProtheusConnectionStore>(
-        create: (_) => ProtheusConnectionStore(),
       ),
       ChangeNotifierProvider<WarehouseRequestStore>(
         create: (_) => WarehouseRequestStore(),

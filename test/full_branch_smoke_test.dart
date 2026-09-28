@@ -13,13 +13,11 @@ import 'package:vetti_flow_1_0/data/models/protheus_product_lookup.dart';
 import 'package:vetti_flow_1_0/data/models/production_flow.dart';
 import 'package:vetti_flow_1_0/data/models/responsavel.dart';
 import 'package:vetti_flow_1_0/data/models/warehouse_request.dart';
-import 'package:vetti_flow_1_0/data/repositories/mutation_sync_service.dart';
 import 'package:vetti_flow_1_0/data/repositories/op_repository.dart';
-import 'package:vetti_flow_1_0/data/repositories/protheus_order_publisher.dart';
 import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
 import 'package:vetti_flow_1_0/data/repositories/pending_mutation_store.dart';
 import 'package:vetti_flow_1_0/data/repositories/production_flow_store.dart';
-import 'package:vetti_flow_1_0/data/repositories/protheus_connection_store.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_order_publisher.dart';
 import 'package:vetti_flow_1_0/data/repositories/protheus_sync_client.dart';
 import 'package:vetti_flow_1_0/data/repositories/warehouse_request_store.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_theme.dart';
@@ -48,7 +46,7 @@ void main() {
             op: 'OP-TESTE-FILA',
           ),
         );
-      final client = ProtheusSyncClient(baseUrl: 'http://localhost:8000');
+      final client = _healthClient();
       addTearDown(client.dispose);
 
       await tester.pumpWidget(
@@ -60,18 +58,13 @@ void main() {
             ChangeNotifierProvider<OperatorAssignmentStore>(
               create: (_) => OperatorAssignmentStore(),
             ),
-            ChangeNotifierProvider<ProtheusConnectionStore>(
-              create: (_) => ProtheusConnectionStore(),
-            ),
             ChangeNotifierProvider<WarehouseRequestStore>(
               create: (_) => WarehouseRequestStore(
                 seedRequests: const <WarehouseConfirmationRequest>[],
               ),
             ),
             ChangeNotifierProvider<PendingMutationStore>.value(value: queue),
-            ChangeNotifierProvider<MutationSyncService>(
-              create: (_) => MutationSyncService(store: queue, client: client),
-            ),
+            Provider<ProtheusSyncClient>.value(value: client),
             RepositoryProvider<OpRepository>.value(value: repository),
           ],
           child: MaterialApp(
@@ -86,13 +79,16 @@ void main() {
       await _login(tester, user: 'tatiane', password: '1001');
 
       expect(find.text('Painel de Produção'), findsOneWidget);
-      expect(find.byTooltip('1 aguardando envio ao Protheus'), findsOneWidget);
+      expect(find.byTooltip('1 rascunho local sem envio'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('1 aguardando envio ao Protheus'));
+      await tester.tap(find.byTooltip('1 rascunho local sem envio'));
       await tester.pumpAndSettle();
 
       expect(find.text('Fila do Protheus'), findsOneWidget);
-      expect(find.text('Aguardando envio para a API'), findsOneWidget);
+      expect(
+        find.text('Rascunhos locais sem envio ao Protheus'),
+        findsOneWidget,
+      );
       expect(find.textContaining('Transferir - 100-010'), findsOneWidget);
 
       Navigator.of(tester.element(find.text('Fila do Protheus'))).pop();
@@ -160,59 +156,58 @@ void main() {
     },
   );
 
-  test(
-    'Vitor API client sends queued mutations and reads stored result',
-    () async {
-      final mutation = TransferenciaMutation(
-        id: 'vf-test-1',
-        filial: '04',
-        criadoEm: DateTime(2026, 8, 5, 9),
-        autor: 'Tatiane',
-        produto: '100-010',
-        produtoDescricao: 'PARAFUSO 2,9 X 6,5 MM ZI',
-        quantidade: 12,
-        localOrigem: '01',
-        localDestino: '05',
-        op: 'OP-2026-9000',
-      );
+  test('client read-only blocks queued mutations before HTTP', () async {
+    final mutation = TransferenciaMutation(
+      id: 'vf-test-1',
+      filial: '04',
+      criadoEm: DateTime(2026, 8, 5, 9),
+      autor: 'Tatiane',
+      produto: '100-010',
+      produtoDescricao: 'PARAFUSO 2,9 X 6,5 MM ZI',
+      quantidade: 12,
+      localOrigem: '01',
+      localDestino: '05',
+      op: 'OP-2026-9000',
+    );
 
-      final client = ProtheusSyncClient(
-        baseUrl: 'http://api.test',
-        apiToken: 'segredo-teste',
-        httpClient: MockClient((request) async {
-          expect(request.method, 'POST');
-          expect(request.url.path, '/api/v1/mutations');
-          expect(request.headers['X-API-Token'], 'segredo-teste');
+    final requests = <String>[];
+    final client = ProtheusSyncClient(
+      baseUrl: 'http://api.test',
+      httpClient: MockClient((request) async {
+        requests.add('${request.method} ${request.url.path}');
+        return http.Response(jsonEncode({'ok': true}), 200);
+      }),
+    );
+    addTearDown(client.dispose);
 
-          final body = jsonDecode(request.body) as Map<String, dynamic>;
-          final mutations = body['mutations'] as List<dynamic>;
-          expect(mutations, hasLength(1));
-          expect(mutations.single['id'], 'vf-test-1');
-          expect(mutations.single['kind'], 'transferencia');
+    final push = await client.push([mutation]);
+    final finalizar = await client.finalizar(const ['vf-test-1']);
 
-          return http.Response(
-            jsonEncode({
-              'results': [
-                {
-                  'id': 'vf-test-1',
-                  'status': 'armazenado',
-                  'protheusRef': 'MUT-0001',
-                },
-              ],
-            }),
-            200,
-          );
+    expect(push.single.id, 'vf-test-1');
+    expect(push.single.status, MutationStatus.erro);
+    expect(push.single.erro, contains('somente leitura'));
+    expect(finalizar.single.status, MutationStatus.erro);
+    expect(finalizar.single.erro, contains('somente leitura'));
+    expect(requests, isEmpty);
+  });
+}
+
+ProtheusSyncClient _healthClient() {
+  return ProtheusSyncClient(
+    baseUrl: 'http://api.local',
+    httpClient: MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'ok': true,
+          'banco': 'HMLp12',
+          'aplicando': false,
+          'readOnly': true,
+          'empresa': '010',
         }),
+        200,
+        headers: {'content-type': 'application/json'},
       );
-      addTearDown(client.dispose);
-
-      final results = await client.push([mutation]);
-
-      expect(results, hasLength(1));
-      expect(results.single.id, 'vf-test-1');
-      expect(results.single.status, MutationStatus.armazenado);
-      expect(results.single.protheusRef, 'MUT-0001');
-    },
+    }),
   );
 }
 

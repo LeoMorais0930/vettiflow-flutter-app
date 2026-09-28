@@ -263,6 +263,32 @@ def reservar(entrada: ReservarIn | None = None,
     return _saida(item, com_reserva=True)
 
 
+@router.get("/consumidor/pendentes")
+def pendentes(limit: int = Query(default=20, ge=1, le=100),
+              x_vettiflow_consumer_key: str | None = Header(default=None)) -> list[dict]:
+    """Só consulta: a opção de menu mostra o pedido antes de reservar."""
+    _exigir_consumidor(x_vettiflow_consumer_key)
+    itens = store().listar("pendente", limit)
+    return [_saida(item) for item in reversed(itens)
+            if item.operacao in config.QUEUE_OPERATIONS]
+
+
+@router.post("/consumidor/solicitacoes/{id_}/reservar")
+def reservar_id(id_: UUID,
+                x_vettiflow_consumer_key: str | None = Header(default=None)) -> dict:
+    _exigir_consumidor(x_vettiflow_consumer_key)
+    atual = store().obter(str(id_))
+    if atual is None:
+        raise HTTPException(404, "Solicitação não encontrada.")
+    if atual.operacao not in config.QUEUE_OPERATIONS:
+        raise HTTPException(503, f"Operação {atual.operacao} não liberada nesta API.")
+    item = store().reservar_id(str(id_), config.QUEUE_RESERVATION_MINUTES)
+    if item is None:
+        raise HTTPException(409, "Solicitação já não está pendente: outro consumidor pegou"
+                                 " ou ela foi concluída.")
+    return _saida(item, com_reserva=True)
+
+
 @router.post("/consumidor/solicitacoes/{id_}/resultado")
 def registrar_resultado(id_: UUID, entrada: ResultadoIn,
                         x_vettiflow_consumer_key: str | None = Header(default=None)) -> dict:

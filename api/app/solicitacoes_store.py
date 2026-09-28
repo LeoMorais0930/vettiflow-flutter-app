@@ -112,6 +112,10 @@ class SolicitacaoStore(ABC):
         """Passa a mais antiga `pendente` para `processando`, atomicamente."""
 
     @abstractmethod
+    def reservar_id(self, id_: str, minutos: int) -> Solicitacao | None:
+        """Reserva uma solicitação específica, se ainda estiver `pendente`."""
+
+    @abstractmethod
     def registrar_resultado(self, id_: str, reserva: str, resultado: Resultado) -> Solicitacao: ...
 
     @abstractmethod
@@ -274,15 +278,23 @@ class SqliteSolicitacaoStore(SolicitacaoStore):
                 " ORDER BY criado_em, id LIMIT 1", (PENDENTE, *operacoes)).fetchone()
             if row is None:
                 return None
-            agora = _iso(_agora())
-            cursor = conn.execute(
-                "UPDATE solicitacoes SET status = ?, reserva = ?, reservado_em = ?,"
-                " atualizado_em = ? WHERE id = ? AND status = ?",
-                (PROCESSANDO, secrets.token_hex(16), agora, agora, row["id"], PENDENTE))
-            if cursor.rowcount != 1:
-                return None
-            self._evento(conn, row["id"], PENDENTE, PROCESSANDO)
-            return self._buscar(conn, row["id"])
+            return self._reservar(conn, row["id"])
+
+    def reservar_id(self, id_: str, minutos: int) -> Solicitacao | None:
+        with self._transacao() as conn:
+            self._expirar(conn, minutos)
+            return self._reservar(conn, id_)
+
+    def _reservar(self, conn, id_: str) -> Solicitacao | None:
+        agora = _iso(_agora())
+        cursor = conn.execute(
+            "UPDATE solicitacoes SET status = ?, reserva = ?, reservado_em = ?,"
+            " atualizado_em = ? WHERE id = ? AND status = ?",
+            (PROCESSANDO, secrets.token_hex(16), agora, agora, id_, PENDENTE))
+        if cursor.rowcount != 1:
+            return None
+        self._evento(conn, id_, PENDENTE, PROCESSANDO)
+        return self._buscar(conn, id_)
 
     def registrar_resultado(self, id_: str, reserva: str, resultado: Resultado) -> Solicitacao:
         with self._transacao() as conn:

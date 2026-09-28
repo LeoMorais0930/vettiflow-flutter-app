@@ -317,3 +317,27 @@ def test_conferir_abertura_sem_op(monkeypatch):
 
     assert confere is False
     assert "não encontrada" in mensagem
+
+
+def test_menu_ve_pendentes_sem_reservar_e_reserva_o_escolhido(fila):
+    primeiro, segundo = _pedido(), _pedido()
+    fila.post("/api/v1/solicitacoes", json=primeiro)
+    fila.post("/api/v1/solicitacoes", json=segundo)
+
+    lista = fila.get("/api/v1/consumidor/pendentes", headers=CONSUMIDOR)
+    assert [item["id"] for item in lista.json()] == [primeiro["id"], segundo["id"]]
+    assert all("reserva" not in item for item in lista.json())
+
+    reservado = fila.post(f"/api/v1/consumidor/solicitacoes/{segundo['id']}/reservar",
+                          headers=CONSUMIDOR)
+    assert reservado.status_code == 200
+    assert reservado.json()["reserva"]
+    de_novo = fila.post(f"/api/v1/consumidor/solicitacoes/{segundo['id']}/reservar",
+                        headers=CONSUMIDOR)
+    assert de_novo.status_code == 409
+    restantes = fila.get("/api/v1/consumidor/pendentes", headers=CONSUMIDOR).json()
+    assert [item["id"] for item in restantes] == [primeiro["id"]]
+
+
+def test_pendentes_exige_chave_do_consumidor(fila):
+    assert fila.get("/api/v1/consumidor/pendentes").status_code == 401

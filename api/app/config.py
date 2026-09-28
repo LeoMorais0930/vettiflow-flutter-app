@@ -55,6 +55,10 @@ PROTHEUS_REST_URL = os.getenv("VF_PROTHEUS_REST_URL", "").strip().rstrip("/")
 
 # Escrita passa pelo AppServer. A conexão SQL permanece exclusivamente de leitura.
 WRITE_ENABLED = os.getenv("VF_WRITE_ENABLED", "false").lower() == "true"
+# Fluxo SQL independente do adapter ADVPL e da fila de rascunhos antiga.
+SQL_WRITE_ENABLED = os.getenv("VF_SQL_WRITE_ENABLED", "false").lower() == "true"
+SQL_EXCLUSIVE_DEV = os.getenv("VF_SQL_EXCLUSIVE_DEV", "false").lower() == "true"
+SQL_WRITE_TOKEN = os.getenv("VF_SQL_WRITE_TOKEN", "").strip()
 PROTHEUS_WRITE_URL = os.getenv("VF_PROTHEUS_WRITE_URL", "").strip().rstrip("/")
 WRITE_LEDGER = Path(os.getenv(
     "VF_WRITE_LEDGER", str(Path(__file__).resolve().parents[1] / "data" / "dev-writes.sqlite3")

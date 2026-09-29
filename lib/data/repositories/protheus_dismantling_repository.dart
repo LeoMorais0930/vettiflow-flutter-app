@@ -35,7 +35,7 @@ class ApiProtheusDismantlingRepository
     this.apiToken = '',
     http.Client? httpClient,
   }) : baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), ''),
-       _http = httpClient ?? http.Client();
+       _http = httpClient ?? ApiSettings.createClient();
 
   final String baseUrl;
   final String apiToken;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'solicitacoes_page.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/data/models/pending_mutation.dart';
@@ -29,6 +30,13 @@ class FilaProtheusPage extends StatelessWidget {
         foregroundColor: AppColors.text,
         elevation: 0,
         actions: [
+          IconButton(
+            tooltip: 'Solicitações ADVPL na API',
+            icon: const Icon(Icons.cloud_queue),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SolicitacoesPage()),
+            ),
+          ),
           IconButton(
             tooltip: 'Desmontagens Protheus',
             icon: const Icon(Icons.call_split_rounded),

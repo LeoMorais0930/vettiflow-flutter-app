@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'flow_execution.dart';
 import 'package:vetti_flow_1_0/data/models/production_flow.dart';
 import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
 
@@ -74,7 +75,12 @@ enum StatusOP {
 class OrdemProducao {
   final String numero;
   final String produto;
-  final int qtd;
+  final num qtd;
+  final bool erpReadOnly;
+  final Map<String, String>? erpKey;
+  final FlowExecution? execution;
+  final bool encerradaNoErp;
+  final String dataEncerramento;
   final String responsavel;
   final String dataAbertura;
   final String prazo;
@@ -102,6 +108,11 @@ class OrdemProducao {
   final List<ResumoAssinaturaOp> assinaturas;
 
   const OrdemProducao({
+    this.erpReadOnly = false,
+    this.erpKey,
+    this.execution,
+    this.encerradaNoErp = false,
+    this.dataEncerramento = '',
     required this.numero,
     required this.produto,
     required this.qtd,
@@ -128,6 +139,12 @@ class OrdemProducao {
     this.assinaturas = const [],
   });
 
+  String get conclusaoLabel => encerradaNoErp
+      ? 'Encerrada no Protheus'
+      : erpReadOnly
+      ? 'Concluída no painel'
+      : 'Finalizada';
+
   String get qtdLabel => '$qtd un';
 
   String get prazoLabel => 'Prazo $prazo';
@@ -140,9 +157,12 @@ class OrdemProducao {
       status == StatusOP.emAndamento || status == StatusOP.finalizada;
 
   OrdemProducao copyWith({
+    FlowExecution? execution,
+    bool? encerradaNoErp,
+    String? dataEncerramento,
     String? numero,
     String? produto,
-    int? qtd,
+    num? qtd,
     String? responsavel,
     String? dataAbertura,
     String? prazo,
@@ -166,6 +186,11 @@ class OrdemProducao {
     List<ResumoAssinaturaOp>? assinaturas,
   }) {
     return OrdemProducao(
+      erpReadOnly: erpReadOnly,
+      erpKey: erpKey,
+      execution: execution ?? this.execution,
+      encerradaNoErp: encerradaNoErp ?? this.encerradaNoErp,
+      dataEncerramento: dataEncerramento ?? this.dataEncerramento,
       numero: numero ?? this.numero,
       produto: produto ?? this.produto,
       qtd: qtd ?? this.qtd,

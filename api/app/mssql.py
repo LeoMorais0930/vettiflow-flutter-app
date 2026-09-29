@@ -29,6 +29,27 @@ def tabela(nome: str) -> str:
     return f"{schema}.{table}"
 
 
+def active_users() -> list[dict[str, Any]]:
+    """General user directory in the configured database; no credential columns."""
+    table = f"{_quote_identifier(config.MSSQL_SCHEMA)}.[SYS_USR]"
+    with conexao() as conn:
+        return _fetchall(conn, f"""
+            SELECT LTRIM(RTRIM(USR_ID)) AS id,
+                   LTRIM(RTRIM(USR_CODIGO)) AS username,
+                   LTRIM(RTRIM(USR_NOME)) AS name
+            FROM {table}
+            WHERE D_E_L_E_T_ <> '*'
+              AND USR_MSBLQL = '2'
+              AND LTRIM(RTRIM(USR_CODIGO)) <> ''
+              AND (LTRIM(RTRIM(USR_MSBLQD)) = ''
+                   OR (LEN(LTRIM(RTRIM(USR_MSBLQD))) = 8
+                       AND USR_MSBLQD NOT LIKE '%[^0-9]%'
+                       AND ISDATE(USR_MSBLQD) = 1
+                       AND USR_MSBLQD >= CONVERT(char(8), GETDATE(), 112)))
+            ORDER BY USR_NOME, USR_CODIGO
+        """)
+
+
 @contextmanager
 def conexao():
     try:
@@ -281,6 +302,7 @@ def components_for(codigo: str, filial: str) -> list[dict[str, Any]]:
 
 def open_orders(filial: str) -> list[dict[str, Any]]:
     sc2 = tabela("SC2")
+    sd4 = tabela("SD4")
     with conexao() as conn:
         rows = _fetchall(
             conn,
@@ -293,6 +315,15 @@ def open_orders(filial: str) -> list[dict[str, Any]]:
               LTRIM(RTRIM(C2_ITEMGRD)) AS itemGrade,
               LTRIM(RTRIM(C2_PRODUTO)) AS produto,
               C2_QUANT AS quantidade,
+              C2_QUJE AS produzida,
+              (SELECT COUNT(*) FROM {sd4} d
+               WHERE d.D_E_L_E_T_ <> '*' AND d.D4_FILIAL = C2_FILIAL
+                 AND RTRIM(d.D4_OP) = RTRIM(C2_NUM) + RTRIM(C2_ITEM) + RTRIM(C2_SEQUEN) + COALESCE(RTRIM(C2_ITEMGRD), '')
+                 AND d.D4_QUANT > 0 AND UPPER(LTRIM(d.D4_COD)) NOT LIKE 'MOD%') AS materiaisPendentes,
+              (SELECT COUNT(*) FROM {sd4} d
+               WHERE d.D_E_L_E_T_ <> '*' AND d.D4_FILIAL = C2_FILIAL
+                 AND RTRIM(d.D4_OP) = RTRIM(C2_NUM) + RTRIM(C2_ITEM) + RTRIM(C2_SEQUEN) + COALESCE(RTRIM(C2_ITEMGRD), '')
+                 AND d.D4_QUANT > 0 AND UPPER(LTRIM(d.D4_COD)) LIKE 'MOD%') AS modPendente,
               LTRIM(RTRIM(C2_LOCAL)) AS local,
               C2_EMISSAO AS emissao,
               C2_DATPRF AS previsao
@@ -309,6 +340,36 @@ def open_orders(filial: str) -> list[dict[str, Any]]:
         row["previsao"] = _date_br(row.get("previsao"))
         row["encerrada"] = False
     return rows
+
+
+def closed_orders(filial: str, after: int = 0, page_size: int = 2000) -> dict:
+    """Histórico oficial com cursor estável; nenhuma alteração no ERP."""
+    if after < 0 or not 1 <= page_size <= 2000:
+        raise ValueError('Paginação inválida')
+    with conexao() as conn:
+        rows = _fetchall(conn, f"""
+            SELECT TOP (?) R_E_C_N_O_ AS recordId,
+              C2_FILIAL AS filial, LTRIM(RTRIM(C2_NUM)) AS numero,
+              LTRIM(RTRIM(C2_ITEM)) AS item, LTRIM(RTRIM(C2_SEQUEN)) AS sequencia,
+              LTRIM(RTRIM(C2_ITEMGRD)) AS itemGrade,
+              LTRIM(RTRIM(C2_PRODUTO)) AS produto,
+              C2_QUANT AS quantidade, C2_QUJE AS produzida,
+              LTRIM(RTRIM(C2_LOCAL)) AS local,
+              C2_EMISSAO AS emissao, C2_DATPRF AS previsao, C2_DATRF AS encerramento
+            FROM {tabela('SC2')}
+            WHERE D_E_L_E_T_ <> '*' AND C2_FILIAL = ?
+              AND LTRIM(RTRIM(C2_DATRF)) <> '' AND R_E_C_N_O_ > ?
+            ORDER BY R_E_C_N_O_
+        """, (page_size + 1, filial, after))
+    has_more = len(rows) > page_size
+    rows = rows[:page_size]
+    next_cursor = int(rows[-1]['recordId']) if has_more else None
+    for row in rows:
+        row.pop('recordId', None)
+        for field in ('emissao', 'previsao', 'encerramento'):
+            row[field] = _date_br(row.get(field))
+        row['encerrada'] = True
+    return {'items': rows, 'nextCursor': next_cursor}
 
 
 def commitments_for(op: str, filial: str) -> list[dict[str, Any]]:
@@ -362,8 +423,13 @@ def production_completion_preview(
     op: str,
     filial: str,
     quantidade: float | None = None,
+    armazem: str | None = None,
 ) -> dict[str, Any]:
-    """Previa read-only dos movimentos esperados para apontar uma OP."""
+    """Previa read-only dos movimentos esperados para apontar uma OP.
+
+    `armazem` troca o local de entrada do acabado (PR0), como o campo
+    Armazem da MATA250, que vem preenchido mas aceita edicao.
+    """
     normalized = _normalize_op(op)
     with conexao() as conn:
         ordem = _official_order(conn, normalized, filial)
@@ -391,7 +457,10 @@ def production_completion_preview(
     remaining = max(planned - produced, 0)
     requested = quantidade if quantidade is not None else remaining
     requested = max(float(requested or 0), 0)
-    finished_local = _finished_goods_preview_local(ordem, movimentos)
+    # Igual a MATA250: sugere sempre o C2_LOCAL, mesmo com PR0 anterior.
+    default_local = str(ordem.get("local") or "").strip()
+    chosen_local = (armazem or "").strip().upper()
+    finished_local = chosen_local or default_local
     document = _document_preview_reference(normalized, ordem, movimentos)
 
     preview_movements = [
@@ -422,6 +491,9 @@ def production_completion_preview(
                 "documentoReferencia": document,
             }
         )
+        # MOD representa mão de obra, não uma peça com saldo físico.
+        if str(commitment.get("produto") or "").strip().upper().startswith("MOD"):
+            continue
         balance = _component_preview_balance(commitment, filial, quantity)
         component_balances.append(balance)
         if not balance["suficiente"]:
@@ -431,6 +503,13 @@ def production_completion_preview(
                 f"{balance['saldoAtual']} disponivel, {quantity} previsto."
             )
 
+    if chosen_local and chosen_local not in {
+        str(item.get("code") or "").strip().upper()
+        for item in warehouses(filial)
+    }:
+        divergences.append(
+            f"Armazem {chosen_local} nao cadastrado na NNR da filial {filial}."
+        )
     if ordem.get("encerrada"):
         divergences.append("OP ja encerrada em SC2; apontamento deve ser bloqueado.")
     if remaining and requested > remaining:
@@ -448,6 +527,8 @@ def production_completion_preview(
         "rotinasCandidatas": ["MATA250", "MATA680", "MATA681"],
         "quantidadeSolicitada": requested,
         "quantidadeRestante": remaining,
+        "armazemPadrao": default_local,
+        "armazemInformado": chosen_local,
         "ordem": ordem,
         "movimentosPrevistos": preview_movements,
         "saldosComponentes": component_balances,
@@ -685,20 +766,6 @@ def inventory_audit_movements(
             "operacional e estorno automatico quando CF/TM nao bastarem.",
         ],
     }
-
-
-def _finished_goods_preview_local(
-    ordem: dict[str, Any],
-    movimentos: list[dict[str, Any]],
-) -> str:
-    for movement in movimentos:
-        if (
-            movement.get("cf") == "PR0"
-            and str(movement.get("local") or "").strip()
-            and str(movement.get("estornoRaw") or "").strip().upper() != "S"
-        ):
-            return str(movement.get("local") or "").strip()
-    return str(ordem.get("local") or "").strip()
 
 
 def _component_preview_quantity(

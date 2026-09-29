@@ -58,6 +58,7 @@ class TableView extends StatelessWidget {
               DataColumn(label: _HeaderText('ABERTURA')),
               DataColumn(label: _HeaderText('PRAZO')),
               DataColumn(label: _HeaderText('STATUS')),
+              DataColumn(label: _HeaderText('EXECUÇÃO VETTIFLOW')),
               DataColumn(label: _HeaderText('PROGRESSO')),
             ],
             rows: ordens.map((op) {
@@ -168,7 +169,28 @@ class TableView extends StatelessWidget {
                       ],
                     ),
                   ),
-                  DataCell(_StatusBadge(status: op.status)),
+                  DataCell(
+                    _StatusBadge(
+                      status: op.status,
+                      label: op.status == StatusOP.finalizada
+                          ? op.conclusaoLabel
+                          : null,
+                    ),
+                  ),
+                  DataCell(
+                    Tooltip(
+                      message: op.execution == null
+                          ? ''
+                          : 'Último registro: ${op.execution!.actor}\n${op.execution!.note}',
+                      child: Text(
+                        op.execution == null
+                            ? (op.encerradaNoErp
+                                  ? 'Sem registro interno'
+                                  : 'Sem execução registrada')
+                            : '${op.execution!.stage.label} · ${op.execution!.statusLabel}',
+                      ),
+                    ),
+                  ),
                   DataCell(
                     SizedBox(
                       width: 160,
@@ -240,8 +262,9 @@ class _HeaderText extends StatelessWidget {
 
 class _StatusBadge extends StatelessWidget {
   final StatusOP status;
+  final String? label;
 
-  const _StatusBadge({required this.status});
+  const _StatusBadge({required this.status, this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -264,7 +287,7 @@ class _StatusBadge extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            status.shortLabel,
+            label ?? status.shortLabel,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,

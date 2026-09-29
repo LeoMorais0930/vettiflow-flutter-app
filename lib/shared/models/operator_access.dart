@@ -22,7 +22,7 @@ extension OperatorAccess on Operator {
   bool get isSectorOwner => switch (area) {
     WorkArea.production => username == 'tatiane',
     WorkArea.warehouse => username == 'vera',
-    WorkArea.smd => username == 'paula',
+    WorkArea.smd => username == 'paula' || username == 'paulad',
     WorkArea.support => username == 'bruno',
     WorkArea.system => isAdministrator,
   };

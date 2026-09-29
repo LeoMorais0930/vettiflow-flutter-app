@@ -46,7 +46,10 @@ class OrdensView extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           '${state.ordens.length} ordens cadastradas',
-                          style: const TextStyle(fontSize: 12.5, color: AppColors.muted),
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.muted,
+                          ),
                         ),
                       ],
                     ),
@@ -58,9 +61,17 @@ class OrdensView extends StatelessWidget {
                       foregroundColor: Colors.white,
                       elevation: 0,
                       minimumSize: Size.zero,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-                      textStyle: GoogleFonts.ibmPlexSans(fontSize: 13, fontWeight: FontWeight.w600),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 9,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      textStyle: GoogleFonts.ibmPlexSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     icon: const Text('+', style: TextStyle(fontSize: 17)),
                     label: const Text('Nova OP'),
@@ -92,7 +103,11 @@ class OrdensView extends StatelessWidget {
                           flex: 2,
                           child: _Dropdown(
                             value: state.filtroPeriodo,
-                            items: const {'todos': 'Todos os períodos', 'jun': 'Junho 2026', 'mai': 'Maio 2026'},
+                            items: const {
+                              'todos': 'Todos os períodos',
+                              'jun': 'Junho 2026',
+                              'mai': 'Maio 2026',
+                            },
                             onChanged: cubit.setFiltroPeriodo,
                           ),
                         ),
@@ -101,7 +116,11 @@ class OrdensView extends StatelessWidget {
                           flex: 2,
                           child: _Dropdown(
                             value: state.filtroResponsavel,
-                            items: {'todos': 'Todos os responsáveis', for (final r in state.responsaveis) r.nome: r.nome},
+                            items: {
+                              'todos': 'Todos os responsáveis',
+                              for (final r in state.responsaveis)
+                                r.nome: r.nome,
+                            },
                             onChanged: cubit.setFiltroResponsavel,
                           ),
                         ),
@@ -110,7 +129,10 @@ class OrdensView extends StatelessWidget {
                           flex: 2,
                           child: _Dropdown(
                             value: state.filtroProduto,
-                            items: {'todos': 'Todos os produtos', for (final p in state.produtos) p: p},
+                            items: {
+                              'todos': 'Todos os produtos',
+                              for (final p in state.produtos) p: p,
+                            },
                             onChanged: cubit.setFiltroProduto,
                           ),
                         ),
@@ -130,19 +152,30 @@ class OrdensView extends StatelessWidget {
                               labelStyle: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: active ? s.textColor : AppColors.textMuted,
+                                color: active
+                                    ? s.textColor
+                                    : AppColors.textMuted,
                               ),
                               avatar: Container(
-                                width: 8, height: 8,
-                                decoration: BoxDecoration(color: s.dot, shape: BoxShape.circle),
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: s.dot,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
                               backgroundColor: AppColors.surface,
                               selectedColor: s.bgColor,
-                              side: BorderSide(color: active ? s.dot : AppColors.border),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+                              side: BorderSide(
+                                color: active ? s.dot : AppColors.border,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(99),
+                              ),
                               showCheckmark: false,
                               onSelected: (_) => cubit.toggleStatusFilter(s),
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
                               visualDensity: VisualDensity.compact,
                             ),
                           );
@@ -153,14 +186,26 @@ class OrdensView extends StatelessWidget {
                             onPressed: cubit.limparFiltros,
                             style: TextButton.styleFrom(
                               foregroundColor: AppColors.primary,
-                              textStyle: GoogleFonts.ibmPlexSans(fontSize: 12.5, fontWeight: FontWeight.w500),
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              textStyle: GoogleFonts.ibmPlexSans(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 4,
+                              ),
                               minimumSize: Size.zero,
                             ),
                             child: const Text('Limpar filtros'),
                           ),
                         const SizedBox(width: 8),
-                        Text(state.resultText, style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
+                        Text(
+                          state.resultText,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.muted,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -215,7 +260,9 @@ class _OrdensTable extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final tableWidth = constraints.maxWidth < 900 ? 900.0 : constraints.maxWidth;
+          final tableWidth = constraints.maxWidth < 900
+              ? 900.0
+              : constraints.maxWidth;
           return SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: SizedBox(
@@ -224,7 +271,10 @@ class _OrdensTable extends StatelessWidget {
                 children: [
                   Container(
                     color: AppColors.bgHeader,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     child: const Row(
                       children: [
                         SizedBox(width: 110, child: _ColHeader('OP')),
@@ -241,7 +291,10 @@ class _OrdensTable extends StatelessWidget {
                   Expanded(
                     child: ListView.builder(
                       itemCount: ordens.length,
-                      itemBuilder: (_, i) => _OrderRow(op: ordens[i], onTap: () => onOpenOP(ordens[i].numero)),
+                      itemBuilder: (_, i) => _OrderRow(
+                        op: ordens[i],
+                        onTap: () => onOpenOP(ordens[i].numero),
+                      ),
                     ),
                   ),
                 ],
@@ -278,16 +331,30 @@ class _OrderRow extends StatelessWidget {
               width: 110,
               child: Text(
                 op.numero,
-                style: GoogleFonts.ibmPlexMono(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textCode),
+                style: GoogleFonts.ibmPlexMono(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textCode,
+                ),
               ),
             ),
             Expanded(
               flex: 2,
-              child: Text(op.produto, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textStrong), overflow: TextOverflow.ellipsis),
+              child: Text(
+                op.produto,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textStrong,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             SizedBox(
               width: 60,
-              child: Text(op.qtdLabel, style: const TextStyle(color: AppColors.textMuted)),
+              child: Text(
+                op.qtdLabel,
+                style: const TextStyle(color: AppColors.textMuted),
+              ),
             ),
             Expanded(
               flex: 2,
@@ -295,22 +362,43 @@ class _OrderRow extends StatelessWidget {
                 children: [
                   if (resp != null) ...[
                     Container(
-                      width: 24, height: 24,
-                      decoration: BoxDecoration(color: resp.cor, shape: BoxShape.circle),
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: resp.cor,
+                        shape: BoxShape.circle,
+                      ),
                       alignment: Alignment.center,
-                      child: Text(resp.iniciais, style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w600)),
+                      child: Text(
+                        resp.iniciais,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
                   ],
                   Flexible(
-                    child: Text(op.responsavel, style: const TextStyle(color: AppColors.textSecondary), overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      op.responsavel,
+                      style: const TextStyle(color: AppColors.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
             ),
             SizedBox(
               width: 85,
-              child: Text(op.dataAbertura, style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
+              child: Text(
+                op.dataAbertura,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12.5,
+                ),
+              ),
             ),
             SizedBox(
               width: 85,
@@ -320,17 +408,34 @@ class _OrderRow extends StatelessWidget {
                     child: Text(
                       op.prazo,
                       style: TextStyle(
-                        color: op.atrasada ? AppColors.danger : AppColors.textMuted,
-                        fontWeight: op.atrasada ? FontWeight.w600 : FontWeight.w400,
+                        color: op.atrasada
+                            ? AppColors.danger
+                            : AppColors.textMuted,
+                        fontWeight: op.atrasada
+                            ? FontWeight.w600
+                            : FontWeight.w400,
                       ),
                     ),
                   ),
                   if (op.atrasada) ...[
                     const SizedBox(width: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.dangerBg, borderRadius: BorderRadius.circular(99)),
-                      child: const Text('!', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.danger)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.dangerBg,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: const Text(
+                        '!',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.danger,
+                        ),
+                      ),
                     ),
                   ],
                 ],
@@ -338,7 +443,12 @@ class _OrderRow extends StatelessWidget {
             ),
             SizedBox(
               width: 120,
-              child: _StatusBadge(status: op.status),
+              child: _StatusBadge(
+                status: op.status,
+                label: op.status == StatusOP.finalizada
+                    ? op.conclusaoLabel
+                    : null,
+              ),
             ),
             SizedBox(
               width: 140,
@@ -347,11 +457,19 @@ class _OrderRow extends StatelessWidget {
                   Expanded(
                     child: Container(
                       height: 5,
-                      decoration: BoxDecoration(color: AppColors.bgProgress, borderRadius: BorderRadius.circular(99)),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgProgress,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
                       child: FractionallySizedBox(
                         alignment: Alignment.centerLeft,
                         widthFactor: (op.progresso / 100).clamp(0, 1),
-                        child: Container(decoration: BoxDecoration(color: op.status.barColor, borderRadius: BorderRadius.circular(99))),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: op.status.barColor,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -360,7 +478,11 @@ class _OrderRow extends StatelessWidget {
                     width: 30,
                     child: Text(
                       op.percentLabel,
-                      style: GoogleFonts.ibmPlexMono(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+                      style: GoogleFonts.ibmPlexMono(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textMuted,
+                      ),
                     ),
                   ),
                 ],
@@ -375,23 +497,38 @@ class _OrderRow extends StatelessWidget {
 
 class _StatusBadge extends StatelessWidget {
   final StatusOP status;
+  final String? label;
 
-  const _StatusBadge({required this.status});
+  const _StatusBadge({required this.status, this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: status.bgColor, borderRadius: BorderRadius.circular(99)),
+      decoration: BoxDecoration(
+        color: status.bgColor,
+        borderRadius: BorderRadius.circular(99),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 7, height: 7, decoration: BoxDecoration(color: status.dot, shape: BoxShape.circle)),
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: status.dot,
+              shape: BoxShape.circle,
+            ),
+          ),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
-              status.shortLabel,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: status.textColor),
+              label ?? status.shortLabel,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: status.textColor,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -442,12 +579,18 @@ class _SearchField extends StatelessWidget {
               onChanged: onChanged,
               decoration: InputDecoration(
                 hintText: 'Buscar OP ou produto...',
-                hintStyle: GoogleFonts.ibmPlexSans(fontSize: 13, color: AppColors.muted),
+                hintStyle: GoogleFonts.ibmPlexSans(
+                  fontSize: 13,
+                  color: AppColors.muted,
+                ),
                 border: InputBorder.none,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
               ),
-              style: GoogleFonts.ibmPlexSans(fontSize: 13, color: AppColors.text),
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 13,
+                color: AppColors.text,
+              ),
             ),
           ),
         ],
@@ -461,7 +604,11 @@ class _Dropdown extends StatelessWidget {
   final Map<String, String> items;
   final ValueChanged<String> onChanged;
 
-  const _Dropdown({required this.value, required this.items, required this.onChanged});
+  const _Dropdown({
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -477,9 +624,17 @@ class _Dropdown extends StatelessWidget {
           isDense: true,
           isExpanded: true,
           icon: const Icon(Icons.keyboard_arrow_down, size: 18),
-          style: GoogleFonts.ibmPlexSans(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-          items: items.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
-          onChanged: (v) { if (v != null) onChanged(v); },
+          style: GoogleFonts.ibmPlexSans(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          ),
+          items: items.entries
+              .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
         ),
       ),
     );

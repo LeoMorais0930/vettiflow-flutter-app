@@ -1,4 +1,4 @@
-import 'package:vetti_flow_1_0/shared/models/operator_access.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_auth_session.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
@@ -28,48 +28,61 @@ class _LoginPageState extends State<LoginPage> {
 
   String? _loginError;
 
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
+  bool _submitting = false;
 
-    final op = context.read<OperatorAssignmentStore>().authenticate(
-      _userController.text,
-      _passwordController.text,
-    );
-
-    if (op == null) {
-      setState(() => _loginError = 'Usuario ou senha incorretos.');
-      return;
+  Future<void> _submit() async {
+    if (_submitting || !_formKey.currentState!.validate()) return;
+    final auth = context.read<ProtheusAuthSession>();
+    final operators = context.read<OperatorAssignmentStore>();
+    setState(() {
+      _submitting = true;
+      _loginError = null;
+    });
+    try {
+      await auth.login(_userController.text, _passwordController.text);
+      if (!mounted || !auth.isAuthenticated) return;
+      operators.acceptProtheusIdentity(auth.username!);
+      _passwordController.clear();
+    } on AuthException catch (error) {
+      if (mounted) setState(() => _loginError = error.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
-
-    setState(() => _loginError = null);
-    Navigator.of(context).pushReplacementNamed(op.homeRoute);
   }
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final formFactor = AppBreakpoints.fromWidth(constraints.maxWidth);
-        final isDesktop = formFactor == AppFormFactor.expanded;
+    return AbsorbPointer(
+      absorbing: _submitting,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final formFactor = AppBreakpoints.fromWidth(constraints.maxWidth);
+          final isDesktop = formFactor == AppFormFactor.expanded;
 
-        if (!isDesktop) {
-          return _MobileLoginLayout(
+          if (!isDesktop) {
+            return _MobileLoginLayout(
+              formKey: _formKey,
+              userController: _userController,
+              passwordController: _passwordController,
+              onSubmit: _submit,
+              loginError: _submitting
+                  ? 'Autenticando no Protheus…'
+                  : (_loginError ??
+                        context.read<ProtheusAuthSession>().message),
+            );
+          }
+
+          return _DesktopLoginLayout(
             formKey: _formKey,
             userController: _userController,
             passwordController: _passwordController,
             onSubmit: _submit,
-            loginError: _loginError,
+            loginError: _submitting
+                ? 'Autenticando no Protheus…'
+                : (_loginError ?? context.read<ProtheusAuthSession>().message),
           );
-        }
-
-        return _DesktopLoginLayout(
-          formKey: _formKey,
-          userController: _userController,
-          passwordController: _passwordController,
-          onSubmit: _submit,
-          loginError: _loginError,
-        );
-      },
+        },
+      ),
     );
   }
 }

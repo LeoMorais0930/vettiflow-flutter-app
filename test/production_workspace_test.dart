@@ -241,6 +241,49 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('administrator can plan production without a name allowlist', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1366, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    NovaOrdemDTO? submitted;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: NovaOpDialog(
+            produtos: const ['X - Placa'],
+            responsaveis: const [],
+            currentOperatorName: 'Artur Augusto',
+            canPlanProduction: true,
+            onCreate: (dto) => submitted = dto,
+            onClose: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('production-route')));
+    await tester.tap(find.byKey(const ValueKey('production-route')));
+    await tester.pumpAndSettle();
+    for (final stage in [
+      ProductionStage.firmware,
+      ProductionStage.soldering,
+      ProductionStage.closing,
+      ProductionStage.expedition,
+    ]) {
+      await tester.tap(find.byKey(ValueKey('route-${stage.name}')));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('Usar sequência'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Criar OP'));
+    await tester.tap(find.text('Criar OP'));
+    expect(submitted?.plannedStages, [ProductionStage.testing]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'production consultation includes linked movements outside 05 and retains month',
     (tester) async {

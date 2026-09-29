@@ -1,4 +1,6 @@
+import 'package:vetti_flow_1_0/shared/models/operator_access.dart';
 import 'package:flutter/material.dart';
+import 'widgets/sector_shortcuts.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:vetti_flow_1_0/data/models/ordem_producao.dart';
@@ -71,12 +73,37 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isDesktop = constraints.maxWidth >= 920;
-              if (isDesktop) return _DesktopLayout(constraints: constraints);
-              return _MobileLayout(constraints: constraints);
-            },
+          child: Column(
+            children: [
+              BlocBuilder<DashboardCubit, DashboardState>(
+                builder: (context, state) {
+                  if (state.loadError.isEmpty) return const SizedBox.shrink();
+                  return MaterialBanner(
+                    content: Text(state.loadError),
+                    leading: const Icon(Icons.cloud_off),
+                    actions: [
+                      TextButton(
+                        onPressed: state.databaseSyncing
+                            ? null
+                            : context.read<DashboardCubit>().loadOrdens,
+                        child: const Text('Tentar novamente'),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isDesktop = constraints.maxWidth >= 920;
+                    if (isDesktop) {
+                      return _DesktopLayout(constraints: constraints);
+                    }
+                    return _MobileLayout(constraints: constraints);
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -179,14 +206,28 @@ class _DesktopLayout extends StatelessWidget {
                           ),
                           const SizedBox(height: 18),
                           FilterBar(
+                            periodOptions: state.periodOptions,
+                            filtroSituacao: state.filtroSituacao,
+                            onSituacao: cubit.setFiltroSituacao,
+                            sectors: state.sectors,
+                            filtroSetor: state.filtroSetor,
+                            mostrarConcluidas: state.mostrarConcluidas,
+                            onSetor: cubit.setFiltroSetor,
+                            onMostrarConcluidas: cubit.setMostrarConcluidas,
                             busca: state.busca,
                             filtroPeriodo: state.filtroPeriodo,
                             filtroResponsavel: state.filtroResponsavel,
                             filtroProduto: state.filtroProduto,
-                            responsaveis: state.responsaveis
-                                .map((r) => r.nome)
-                                .toList(),
-                            produtos: state.produtos,
+                            responsaveis: {
+                              ...state.responsaveis.map((r) => r.nome),
+                              ...state.ordens.map((o) => o.responsavel),
+                            }.toList()..sort(),
+                            produtos:
+                                state.ordens
+                                    .map((o) => o.produto)
+                                    .toSet()
+                                    .toList()
+                                  ..sort(),
                             viewMode: state.viewMode,
                             hasActiveFilters: state.hasActiveFilters,
                             resultText: state.resultText,
@@ -219,6 +260,7 @@ class _DesktopLayout extends StatelessWidget {
             if (state.selectedOrdem != null)
               OpDetailPanel(
                 op: state.selectedOrdem!,
+                onExecutionChanged: cubit.loadOrdens,
                 confirmCancel: state.confirmCancel,
                 onClose: cubit.closeOP,
                 onAdvance: ({int quantidadeArmazenada = 0}) =>
@@ -259,6 +301,9 @@ class _DesktopLayout extends StatelessWidget {
                 onLookupProduto: cubit.lookupProdutoPorCodigo,
                 onSearchProdutos: cubit.searchProdutos,
                 currentOperatorName: currentOperatorName,
+                canPlanProduction:
+                    currentOperator?.isAdministrator == true ||
+                    currentOperator?.isProductionManager == true,
                 onCreate: cubit.createOP,
                 onClose: cubit.closeNovaOP,
                 isDesktop: true,
@@ -279,7 +324,11 @@ class _DesktopLayout extends StatelessWidget {
     final ordens = state.ordensFiltradas;
     switch (state.viewMode) {
       case ViewMode.kanban:
-        return KanbanView(ordens: ordens, onOpenOP: cubit.openOP);
+        return KanbanView(
+          ordens: ordens,
+          onOpenOP: cubit.openOP,
+          onRefresh: cubit.loadOrdens,
+        );
       case ViewMode.tabela:
         return TableView(ordens: ordens, onOpenOP: cubit.openOP);
       case ViewMode.cards:
@@ -312,6 +361,7 @@ class _MobileLayout extends StatelessWidget {
         if (state.selectedOrdem != null) {
           return OpDetailPanel(
             op: state.selectedOrdem!,
+            onExecutionChanged: cubit.loadOrdens,
             confirmCancel: state.confirmCancel,
             onClose: cubit.closeOP,
             onAdvance: ({int quantidadeArmazenada = 0}) =>
@@ -356,6 +406,7 @@ class _MobileLayout extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 92),
                     child: Column(
                       children: [
+                        const SectorShortcuts(),
                         const SizedBox(height: 14),
                         if (state.viewMode == ViewMode.relatorios) ...[
                           Padding(
@@ -542,6 +593,9 @@ class _MobileLayout extends StatelessWidget {
                 onLookupProduto: cubit.lookupProdutoPorCodigo,
                 onSearchProdutos: cubit.searchProdutos,
                 currentOperatorName: currentOperatorName,
+                canPlanProduction:
+                    currentOperator?.isAdministrator == true ||
+                    currentOperator?.isProductionManager == true,
                 onCreate: cubit.createOP,
                 onClose: cubit.closeNovaOP,
                 isDesktop: false,
@@ -683,6 +737,7 @@ class _DatabaseSyncOverlay extends StatelessWidget {
 }
 
 bool _canOperatorEditOrder(Operator? operator, OrdemProducao order) {
+  if (order.erpReadOnly) return false;
   if (operator == null) return true;
   if (operator.managesArea == null && operator.canManageAssignments) {
     return true;
@@ -723,6 +778,9 @@ WorkArea _areaForStage(ProductionStage stage) {
 }
 
 String _readOnlyMessage(Operator? operator, OrdemProducao order) {
+  if (order.erpReadOnly) {
+    return 'Movimentações no ERP bloqueadas. Registre o andamento em Execução da etapa, nos detalhes da OP.';
+  }
   final name = operator?.name ?? 'Este usuário';
   return '$name pode acompanhar esta OP em ${order.stage.label}, mas não pode movimentar esta etapa.';
 }
@@ -1116,6 +1174,9 @@ class _FilterSheet extends StatefulWidget {
 }
 
 class _FilterSheetState extends State<_FilterSheet> {
+  late String _situacao;
+  late String _setor;
+  late bool _concluidas;
   late String _periodo;
   late String _responsavel;
   late String _produto;
@@ -1123,6 +1184,9 @@ class _FilterSheetState extends State<_FilterSheet> {
   @override
   void initState() {
     super.initState();
+    _situacao = widget.state.filtroSituacao;
+    _setor = widget.state.filtroSetor;
+    _concluidas = widget.state.mostrarConcluidas;
     _periodo = widget.state.filtroPeriodo;
     _responsavel = widget.state.filtroResponsavel;
     _produto = widget.state.filtroProduto;
@@ -1190,13 +1254,42 @@ class _FilterSheetState extends State<_FilterSheet> {
                 child: Column(
                   children: [
                     _SheetDropdown(
+                      label: 'Situação',
+                      value: _situacao,
+                      items: const {
+                        'todas': 'Todas',
+                        'abertas': 'Em aberto',
+                        'encerradas_erp': 'Encerradas no Protheus',
+                        'concluidas_painel': 'Concluídas no painel',
+                      },
+                      onChanged: (v) => setState(() {
+                        _situacao = v;
+                        _concluidas = true;
+                      }),
+                    ),
+                    const Text(
+                      'Período: encerramento das OPs encerradas no ERP; emissão das demais.',
+                    ),
+                    const SizedBox(height: 12),
+                    _SheetDropdown(
+                      label: 'Setor cadastrado',
+                      value: _setor,
+                      items: {
+                        'todos': 'Todos os setores',
+                        for (final sector in widget.state.sectors)
+                          sector: sector,
+                      },
+                      onChanged: (v) => setState(() => _setor = v),
+                    ),
+                    SwitchListTile.adaptive(
+                      title: const Text('Mostrar concluídas'),
+                      value: _concluidas,
+                      onChanged: (v) => setState(() => _concluidas = v),
+                    ),
+                    _SheetDropdown(
                       label: 'Período',
                       value: _periodo,
-                      items: const {
-                        'todos': 'Todos os períodos',
-                        'jun': 'Junho 2026',
-                        'mai': 'Maio 2026',
-                      },
+                      items: widget.state.periodOptions,
                       onChanged: (v) => setState(() => _periodo = v),
                     ),
                     const SizedBox(height: 15),
@@ -1207,6 +1300,8 @@ class _FilterSheetState extends State<_FilterSheet> {
                         'todos': 'Todos os responsáveis',
                         for (final r in widget.state.responsaveis)
                           r.nome: r.nome,
+                        for (final op in widget.state.ordens)
+                          op.responsavel: op.responsavel,
                       },
                       onChanged: (v) => setState(() => _responsavel = v),
                     ),
@@ -1216,7 +1311,8 @@ class _FilterSheetState extends State<_FilterSheet> {
                       value: _produto,
                       items: {
                         'todos': 'Todos os produtos',
-                        for (final p in widget.state.produtos) p: p,
+                        for (final op in widget.state.ordens)
+                          op.produto: op.produto,
                       },
                       onChanged: (v) => setState(() => _produto = v),
                     ),
@@ -1261,6 +1357,9 @@ class _FilterSheetState extends State<_FilterSheet> {
                       width: 160,
                       child: ElevatedButton(
                         onPressed: () {
+                          widget.cubit.setFiltroSituacao(_situacao);
+                          widget.cubit.setFiltroSetor(_setor);
+                          widget.cubit.setMostrarConcluidas(_concluidas);
                           widget.cubit.setFiltroPeriodo(_periodo);
                           widget.cubit.setFiltroResponsavel(_responsavel);
                           widget.cubit.setFiltroProduto(_produto);

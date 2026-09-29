@@ -11,18 +11,41 @@ class DashboardCubit extends Cubit<DashboardState> {
   DashboardCubit(this._repository) : super(const DashboardState());
 
   Future<void> loadOrdens() async {
-    final ordens = await _repository.fetchOrdens();
-    final armazenadas = await _repository.fetchOrdensArmazenadas();
-    final responsaveis = await _repository.fetchResponsaveis();
-    final produtos = await _repository.fetchProdutos();
+    if (state.databaseSyncing || isClosed) return;
     emit(
       state.copyWith(
-        ordens: ordens,
-        armazenadas: armazenadas,
-        responsaveis: responsaveis,
-        produtos: produtos,
+        databaseSyncing: true,
+        databaseSyncMessage: 'Consultando OPs no Protheus…',
+        loadError: '',
       ),
     );
+    try {
+      final ordens = await _repository.fetchOrdens();
+      final armazenadas = await _repository.fetchOrdensArmazenadas();
+      final responsaveis = await _repository.fetchResponsaveis();
+      final produtos = await _repository.fetchProdutos();
+      if (isClosed) return;
+      emit(
+        state.copyWith(
+          ordens: ordens,
+          armazenadas: armazenadas,
+          responsaveis: responsaveis,
+          produtos: produtos,
+          databaseSyncing: false,
+          databaseSyncMessage: '',
+        ),
+      );
+    } catch (_) {
+      if (isClosed) return;
+      emit(
+        state.copyWith(
+          databaseSyncing: false,
+          databaseSyncMessage: '',
+          loadError:
+              'Não foi possível atualizar as OPs e suas etapas. Os dados exibidos podem estar desatualizados. Tente novamente.',
+        ),
+      );
+    }
   }
 
   void setViewMode(ViewMode mode) {
@@ -36,6 +59,18 @@ class DashboardCubit extends Cubit<DashboardState> {
       ),
     );
   }
+
+  void setFiltroSituacao(String value) => emit(
+    state.copyWith(
+      filtroSituacao: value,
+      mostrarConcluidas: true,
+      filtroStatus: () => null,
+    ),
+  );
+
+  void setFiltroSetor(String value) => emit(state.copyWith(filtroSetor: value));
+  void setMostrarConcluidas(bool value) =>
+      emit(state.copyWith(mostrarConcluidas: value));
 
   void setFiltroPeriodo(String value) {
     emit(state.copyWith(filtroPeriodo: value));
@@ -57,6 +92,9 @@ class DashboardCubit extends Cubit<DashboardState> {
     emit(
       state.copyWith(
         filtroPeriodo: 'todos',
+        filtroSetor: 'todos',
+        filtroSituacao: 'todas',
+        mostrarConcluidas: true,
         filtroResponsavel: 'todos',
         filtroProduto: 'todos',
         filtroStatus: () => null,

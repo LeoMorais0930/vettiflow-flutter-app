@@ -156,15 +156,22 @@ void main() {
           ),
         ],
         child: const MaterialApp(
-          home: Scaffold(body: OperatorAssignmentsView()),
+          home: Scaffold(
+            body: SingleChildScrollView(child: OperatorAssignmentsView()),
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('Atribuição local e solicitações'));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('mobile-operator-selector')), findsOneWidget);
     expect(find.byKey(const Key('mobile-stage-picker')), findsOneWidget);
 
+    await tester.ensureVisible(
+      find.byKey(const Key('mobile-operator-selector')),
+    );
     await tester.tap(find.byKey(const Key('mobile-operator-selector')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sabrina').last);

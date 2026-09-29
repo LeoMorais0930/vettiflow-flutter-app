@@ -1,16 +1,18 @@
-/// Credencial da API do Protheus, num lugar so.
-///
-/// A API exige `X-API-Token` quando esta configurada com `VF_API_TOKEN`. Sem o
-/// cabecalho ela responde 401 — e sem token nenhum configurado do lado dela,
-/// so atende localhost. O valor entra em tempo de build:
-///
-/// ```bash
-/// flutter run --dart-define=VETTIFLOW_API_TOKEN=o-token-combinado
-/// ```
+// Configuração da API do Protheus.
+// A chave interna é adicional ao JWT individual em memória.
+import 'package:http/http.dart' as http;
+import 'protheus_auth_session.dart';
+
 class ApiSettings {
   const ApiSettings._();
 
   static const token = String.fromEnvironment('VETTIFLOW_API_TOKEN');
+  static const baseUrl = String.fromEnvironment(
+    'VETTIFLOW_API_URL',
+    defaultValue: 'http://localhost:8000',
+  );
+  static final session = ProtheusAuthSession(baseUrl: baseUrl, apiKey: token);
+  static http.Client createClient() => session.createClient();
 
   /// Cabecalhos de toda chamada. O token so entra quando foi definido no
   /// build; sem ele a requisicao sai limpa, como antes.

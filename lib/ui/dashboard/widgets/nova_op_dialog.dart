@@ -17,6 +17,7 @@ class NovaOpDialog extends StatefulWidget {
   final Future<ProtheusProductLookup?> Function(String code)? onLookupProduto;
   final Future<List<ProtheusProduct>> Function(String query)? onSearchProdutos;
   final String? currentOperatorName;
+  final bool? canPlanProduction;
   final VoidCallback onClose;
   final bool isDesktop;
 
@@ -28,6 +29,7 @@ class NovaOpDialog extends StatefulWidget {
     this.onLookupProduto,
     this.onSearchProdutos,
     this.currentOperatorName,
+    this.canPlanProduction,
     required this.onClose,
     this.isDesktop = true,
   });
@@ -53,10 +55,12 @@ class _NovaOpDialogState extends State<NovaOpDialog> {
   var _isLookingUp = false;
   int _qtd = 50;
   List<ProductionStage> _plannedStages = [...ProductionRouteField.available];
-  bool get _canPlanProduction => [
-    'tatiane',
-    'andressa',
-  ].contains(widget.currentOperatorName?.trim().toLowerCase());
+  bool get _canPlanProduction =>
+      widget.canPlanProduction ??
+      [
+        'tatiane',
+        'andressa',
+      ].contains(widget.currentOperatorName?.trim().toLowerCase());
   String _prazo = '';
   String _prioridade = 'Media';
   String _filial = '04';

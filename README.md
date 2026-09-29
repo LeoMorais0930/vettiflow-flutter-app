@@ -2,9 +2,18 @@
 
 Aplicativo Flutter para acompanhar os setores da Vetti e consultar o Protheus DEV.
 
+**Autenticação da API em 29/09/2026:** consultas e operações agora exigem sessão
+Bearer obtida por `POST /api/v1/auth/protheus/login`, além da chave interna
+quando configurada. [Uso no Swagger e limites da sessão](api/README.md#sessão-jwt-obrigatória-29092026).
+O login Flutter valida usuário e senha no Protheus pela API e envia o Bearer nas
+consultas. O JWT fica somente em memória; expiração, logout ou HTTP 401 retornam
+à tela de login. `leonardo.morais` tem o perfil de administrador da interface,
+sem conceder privilégios adicionais no ERP. A sessão REST não mantém uma thread permanente
+no WebMonitor. O painel já consulta OPs abertas do ERP. A sessão renova pelo Protheus quando há refresh token, até oito horas; o teste real da renovação no DEV está pendente. A fila do Vitor foi incorporada, mas a execução ADVPL permanece bloqueada até homologação.
+
 **Direção acordada em 28/09/2026: escrita por fila do VettiFlow, consumida por ADVPL que executa as rotinas nativas do Protheus.** Este plano segue a mesma linha do documento **“Plano de escrita no Protheus via ADVPL”**, compartilhado pela T.I. Vetti nessa data, e incorpora a orientação do gestor sobre leitura de JSON e execução dentro do ERP.
 
-**Estado atual:** existem consultas, telas, rascunhos locais e um protótipo anterior de escrita SQL DEV. A nova fila persistente de execução, seu consumidor ADVPL e a integração completa ainda precisam ser implementados e homologados. Nenhuma compilação no RPO ou escrita no ERP foi realizada nesta revisão. Este README é o ponto de partida para continuar essa frente; os documentos anteriores preservam o contexto das alternativas estudadas.
+**Estado atual:** existem consultas, telas, rascunhos locais e um protótipo anterior de escrita SQL DEV. A fila persistente e o consumidor ADVPL inicial foram incorporados do commit 1e12242 do Vitor. A integração de autenticação do consumidor, a compilação e a homologação no ERP permanecem pendentes. Nenhuma compilação no RPO ou escrita no ERP foi realizada nesta revisão. Este README é o ponto de partida para continuar essa frente; os documentos anteriores preservam o contexto das alternativas estudadas.
 
 O [protótipo SQL DEV](docs/desenvolvimento/sql-producao-dev.md) permanece no repositório, desativado por padrão. Ele não é a solução escolhida para a integração operacional. Não habilitar `VF_SQL_WRITE_ENABLED`/`VF_SQL_EXCLUSIVE_DEV` para executar este plano, nem aplicar sua migração como pré-requisito da fila ADVPL. Esta atualização é documental: não remove esse código, não modifica permissões do banco e não altera o `.env` de nenhuma instalação.
 

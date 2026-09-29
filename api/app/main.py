@@ -4,15 +4,21 @@ import logging
 import secrets
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Security
+from fastapi.security import APIKeyHeader, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.openapi.utils import get_openapi
+from starlette.concurrency import run_in_threadpool
 
-from . import config, mssql, warehouse_writes
+from . import config, mssql, warehouse_writes, sessions
 from .sql_production_api import router as sql_production_router, status as sql_status
 from .schemas import FinalizarRequest, Health, MutationBatch
 from .warehouse import router as warehouse_router
 from .warehouse_reports import router as warehouse_reports_router
+from .protheus_auth import router as protheus_auth_router
+from .solicitacoes import router as solicitacoes_router
+from .flow_tracking import router as flow_tracking_router
 
 log = logging.getLogger("vetti_flow_api")
 
@@ -33,11 +39,35 @@ app = FastAPI(
     version="0.3.0",
     description=__doc__,
     lifespan=lifespan,
+    dependencies=[Security(APIKeyHeader(name=CABECALHO_TOKEN, auto_error=False)),
+                  Security(HTTPBearer(scheme_name='ProtheusJWT', auto_error=False))],
+    swagger_ui_parameters={'persistAuthorization': False},
 )
+app.include_router(protheus_auth_router)
 app.include_router(warehouse_router)
 app.include_router(warehouse_reports_router)
 app.include_router(warehouse_writes.router)
 app.include_router(sql_production_router)
+app.include_router(solicitacoes_router)
+app.include_router(flow_tracking_router)
+
+
+def secured_openapi():
+    if app.openapi_schema is None:
+        schema = get_openapi(title=app.title, version=app.version,
+                             description=app.description, routes=app.routes)
+        for path, operations in schema['paths'].items():
+            for operation in operations.values():
+                required = {'APIKeyHeader': []}
+                if path not in {'/api/v1/auth/protheus/login', '/api/v1/auth/protheus/test'}:
+                    required['ProtheusJWT'] = []
+                # Um objeto significa AND: chave interna + JWT, não alternativas.
+                operation['security'] = [required]
+        app.openapi_schema = schema
+    return app.openapi_schema
+
+
+app.openapi = secured_openapi
 
 
 @app.middleware("http")
@@ -47,6 +77,10 @@ async def exigir_token(request: Request, call_next):
         return await call_next(request)
 
     origem = request.client.host if request.client else ""
+    # Documentação acessível localmente; as operações continuam exigindo o token.
+    if (request.method == 'GET' and origem in _LOOPBACK
+            and request.url.path in {'/docs', '/docs/oauth2-redirect', '/redoc', '/openapi.json'}):
+        return await call_next(request)
     if config.API_TOKEN:
         enviado = request.headers.get(CABECALHO_TOKEN, "")
         if not secrets.compare_digest(enviado, config.API_TOKEN):
@@ -63,6 +97,16 @@ async def exigir_token(request: Request, call_next):
             },
         )
 
+    public_auth = request.method == 'POST' and request.url.path in {
+        '/api/v1/auth/protheus/test', '/api/v1/auth/protheus/login',
+    }
+    if not public_auth:
+        try:
+            await run_in_threadpool(sessions.require_session, request)
+        except HTTPException as exc:
+            return JSONResponse(status_code=exc.status_code,
+                                content={'detail': exc.detail},
+                                headers={**(exc.headers or {}), 'Cache-Control': 'no-store'})
     return await call_next(request)
 
 
@@ -132,11 +176,13 @@ def apontamento_preview(
     op: str,
     filial: str = config.FILIAL_PADRAO,
     quantidade: float | None = Query(default=None, gt=0),
+    armazem: str | None = Query(default=None, pattern=r'^[A-Za-z0-9]{2}$'),
 ) -> dict:
     return mssql.production_completion_preview(
         op=op,
         filial=filial,
         quantidade=quantidade,
+        armazem=armazem,
     )
 
 
@@ -189,6 +235,15 @@ def auditoria_estoque(
         tipo=tipo,
         limit=limit,
     )
+
+
+@app.get("/api/v1/ops/encerradas")
+def ops_encerradas(
+    filial: str = config.FILIAL_PADRAO,
+    after: int = Query(default=0, ge=0),
+    page_size: int = Query(default=2000, ge=1, le=2000),
+) -> dict:
+    return mssql.closed_orders(filial, after, page_size)
 
 
 @app.get("/api/v1/ops/abertas")

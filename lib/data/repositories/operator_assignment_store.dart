@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'local_json_persistence.dart';
+import 'package:vetti_flow_1_0/shared/models/protheus_operator_profiles.dart';
 import 'package:vetti_flow_1_0/shared/models/operator.dart';
 import 'package:vetti_flow_1_0/shared/models/operator_access.dart';
 
@@ -21,6 +22,13 @@ class OperatorAssignmentStore extends ChangeNotifier {
   final LocalJsonPersistence? persistence;
   final _permissions = <String, OperatorPermission>{};
   bool _disposed = false;
+  bool _remoteIdentity = false;
+
+  List<Operator> get _roster => _remoteIdentity
+      ? ProtheusOperatorProfiles.operators
+            .where((o) => o.usesAssignedStage)
+            .toList()
+      : assignableOperators;
 
   @override
   void dispose() {
@@ -37,7 +45,7 @@ class OperatorAssignmentStore extends ChangeNotifier {
       if (raw != null) {
         final json = jsonDecode(raw) as Map;
         if (json['version'] == 1) {
-          for (final actor in assignableOperators) {
+          for (final actor in _roster) {
             final level = (json['permissions'] as Map?)?[actor.username];
             for (final candidate in OperatorPermission.values) {
               if (candidate.name == level && !actor.isSectorOwner) {
@@ -84,10 +92,12 @@ class OperatorAssignmentStore extends ChangeNotifier {
   OperatorPermission permissionFor(Operator actor) {
     if (actor.isSectorOwner) return OperatorPermission.manager;
     return _permissions[actor.username] ??
-        (Operator.all.any(
-              (base) =>
-                  base.username == actor.username && base.canManageAssignments,
-            )
+        ((_remoteIdentity ? ProtheusOperatorProfiles.operators : Operator.all)
+                .any(
+                  (base) =>
+                      base.username == actor.username &&
+                      base.canManageAssignments,
+                )
             ? OperatorPermission.manager
             : OperatorPermission.operation);
   }
@@ -103,9 +113,7 @@ class OperatorAssignmentStore extends ChangeNotifier {
   }
 
   void setPermission(String username, OperatorPermission permission) {
-    final target = assignableOperators
-        .where((o) => o.username == username)
-        .firstOrNull;
+    final target = _roster.where((o) => o.username == username).firstOrNull;
     if (target == null || !canSetPermission(target)) {
       throw StateError('Você não pode alterar o acesso deste colaborador.');
     }
@@ -177,8 +185,8 @@ class OperatorAssignmentStore extends ChangeNotifier {
   List<Operator> get visibleAssignableOperators {
     if (currentOperator?.canManageAssignments != true) return [];
     final area = currentManagedArea;
-    if (area == null) return assignableOperators.map(resolve).toList();
-    return assignableOperators
+    if (area == null) return _roster.map(resolve).toList();
+    return _roster
         .where((operator) => operator.area == area)
         .map(resolve)
         .toList();
@@ -202,7 +210,10 @@ class OperatorAssignmentStore extends ChangeNotifier {
             permissionFor(operator) != OperatorPermission.manager)) {
       return operator.stage;
     }
-    return _assignments[operator.username] ?? operator.stage;
+    final saved = _assignments[operator.username];
+    return saved != null && stagesFor(operator).contains(saved)
+        ? saved
+        : operator.stage;
   }
 
   Operator resolve(Operator operator) => operator.copyWithStage(
@@ -213,10 +224,21 @@ class OperatorAssignmentStore extends ChangeNotifier {
   Operator? authenticate(String username, String password) {
     final operator = Operator.authenticate(username, password);
     if (operator == null) return null;
+    _remoteIdentity = false;
+    _restore(persistence?.read());
     final resolved = resolve(operator);
     _currentOperator = operator;
     notifyListeners();
     return resolved;
+  }
+
+  /// Vínculo de interface aplicado somente após login remoto confirmado.
+  /// Não transforma permissões locais em privilégios de escrita no ERP.
+  void acceptProtheusIdentity(String username) {
+    _remoteIdentity = true;
+    _currentOperator = ProtheusOperatorProfiles.find(username);
+    if (persistence != null) _restore(persistence!.read());
+    notifyListeners();
   }
 
   Operator? findByPin(String pin) {
@@ -227,7 +249,7 @@ class OperatorAssignmentStore extends ChangeNotifier {
 
   void assignStage(String username, WorkStage stage) {
     if (persistence != null) _restore(persistence!.read());
-    final operator = assignableOperators.cast<Operator?>().firstWhere(
+    final operator = _roster.cast<Operator?>().firstWhere(
       (operator) => operator?.username == username,
       orElse: () => null,
     );

@@ -10,6 +10,10 @@ class WebHandler(SimpleHTTPRequestHandler):
     # Windows registry may otherwise classify .mjs as text/plain; ES modules refuse it.
     extensions_map = SimpleHTTPRequestHandler.extensions_map | {'.mjs': 'text/javascript'}
 
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store, max-age=0')
+        super().end_headers()
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)

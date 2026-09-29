@@ -299,8 +299,8 @@ def test_auditoria_estoque_delega_para_sql_server(monkeypatch):
 def test_previa_apontamento_delega_para_sql_server(monkeypatch):
     chamadas = []
 
-    def fake_completion_preview(op, filial, quantidade):
-        chamadas.append((op, filial, quantidade))
+    def fake_completion_preview(op, filial, quantidade, armazem=None):
+        chamadas.append((op, filial, quantidade, armazem))
         return {
             "op": op,
             "filial": filial,
@@ -356,11 +356,15 @@ def test_previa_apontamento_delega_para_sql_server(monkeypatch):
     with _client(monkeypatch) as client:
         response = client.get(
             "/api/v1/ops/01621401001/apontamento-preview"
-            "?filial=04&quantidade=50"
+            "?filial=04&quantidade=50&armazem=10"
+        )
+        invalido = client.get(
+            "/api/v1/ops/01621401001/apontamento-preview?armazem=10;x"
         )
 
     assert response.status_code == 200
-    assert chamadas == [("01621401001", "04", 50)]
+    assert invalido.status_code == 422
+    assert chamadas == [("01621401001", "04", 50, "10")]
     payload = response.json()
     assert payload["readOnly"] is True
     assert payload["rotinaStatus"] == "pendente_pesquisa"
@@ -421,3 +425,106 @@ def test_tabela_usa_sufixo_empresa_e_schema(monkeypatch):
     monkeypatch.setattr(config, "MSSQL_SCHEMA", "dbo")
 
     assert mssql.tabela("SB1") == "[dbo].[SB1010]"
+
+
+def _preview_016431(monkeypatch, armazem=None):
+    from contextlib import contextmanager
+
+    @contextmanager
+    def fake_conexao():
+        yield None
+
+    monkeypatch.setattr(mssql, "conexao", fake_conexao)
+    monkeypatch.setattr(mssql, "_official_order", lambda *_: {
+        "produto": "575-0863", "local": "05", "numeroBase": "016431",
+        "quantidadePlanejada": 10, "quantidadeProduzida": 0, "encerrada": False,
+    })
+    monkeypatch.setattr(mssql, "_official_commitments", lambda *_: [
+        {"produto": "106-008", "local": "05",
+         "quantidadeOriginal": 10, "quantidadeRestante": 10},
+    ])
+    # PR0 anterior no 10 nao muda a sugestao: a MATA250 sempre traz o C2_LOCAL.
+    monkeypatch.setattr(mssql, "_official_movements", lambda *_: [
+        {"cf": "PR0", "local": "10", "documento": "016431010"},
+    ])
+    monkeypatch.setattr(mssql, "_component_preview_balance", lambda c, f, q: {
+        "produto": c["produto"], "local": c["local"], "saldoAtual": 13,
+        "quantidadePrevista": q, "suficiente": True,
+    })
+    monkeypatch.setattr(mssql, "warehouses", lambda _f: [
+        {"code": "01"}, {"code": "05"}, {"code": "10"},
+    ])
+    return mssql.production_completion_preview(
+        "01643101001", "04", 10, armazem=armazem,
+    )
+
+
+def test_previa_apontamento_sugere_local_da_op_como_a_mata250(monkeypatch):
+    preview = _preview_016431(monkeypatch)
+
+    assert preview["armazemPadrao"] == "05"
+    assert preview["armazemInformado"] == ""
+    assert preview["movimentosPrevistos"][0]["local"] == "05"
+    # RE1 continua saindo do local do empenho, independente do acabado.
+    assert preview["movimentosPrevistos"][1]["local"] == "05"
+
+
+def test_previa_apontamento_aceita_armazem_editado(monkeypatch):
+    # Caso real da OP 016431: MATA250 sugeriu 05 e a Tatiane apontou no 10.
+    preview = _preview_016431(monkeypatch, armazem="10")
+
+    assert preview["armazemPadrao"] == "05"
+    assert preview["movimentosPrevistos"][0]["local"] == "10"
+    assert preview["movimentosPrevistos"][1]["local"] == "05"
+    assert preview["divergencias"] == []
+
+
+def test_previa_apontamento_avisa_armazem_fora_da_nnr(monkeypatch):
+    preview = _preview_016431(monkeypatch, armazem="99")
+
+    assert preview["movimentosPrevistos"][0]["local"] == "99"
+    assert any("99" in item for item in preview["divergencias"])
+
+
+def test_mod_preview_does_not_validate_physical_stock(monkeypatch):
+    _preview_016431(monkeypatch)
+    monkeypatch.setattr(mssql, "_official_commitments", lambda *_: [
+        {"produto": "MOD001", "local": "05", "quantidadeOriginal": 10, "quantidadeRestante": 10},
+    ])
+    def unexpected_balance(*_):
+        raise AssertionError("MOD must not query physical balance")
+    monkeypatch.setattr(mssql, "_component_preview_balance", unexpected_balance)
+    preview = mssql.production_completion_preview("01643101001", "04", 10)
+    assert preview["saldosComponentes"] == []
+    assert preview["divergencias"] == []
+    assert preview["movimentosPrevistos"][1]["produto"] == "MOD001"
+
+
+def test_encerradas_endpoint_paginado(monkeypatch):
+    calls = []
+    def query(filial, after, page_size):
+        calls.append((filial, after, page_size))
+        return {"items": [{"numero": "123", "encerrada": True, "encerramento": "28/09/2026"}], "nextCursor": None}
+    monkeypatch.setattr(mssql, "closed_orders", query, raising=False)
+    with _client(monkeypatch) as client:
+        result = client.get('/api/v1/ops/encerradas?filial=04&after=7&page_size=2000')
+        assert result.status_code == 200
+        assert result.json()['items'][0]['encerrada'] is True
+        assert client.get('/api/v1/ops/encerradas?page_size=2001').status_code == 422
+    assert calls == [('04', 7, 2000)]
+
+
+def test_closed_orders_cursor_and_dates(monkeypatch):
+    from contextlib import contextmanager
+    @contextmanager
+    def connection():
+        yield None
+    monkeypatch.setattr(mssql, 'conexao', connection)
+    def fetch(conn, sql, args):
+        assert args == (3, '04', 5)
+        return [dict(recordId=i, emissao='20240101', previsao='20240120', encerramento='20260928') for i in (6, 7, 8)]
+    monkeypatch.setattr(mssql, '_fetchall', fetch)
+    page = mssql.closed_orders('04', 5, 2)
+    assert page['nextCursor'] == 7
+    assert len(page['items']) == 2
+    assert page['items'][0] == dict(emissao='01/01/2024', previsao='20/01/2024', encerramento='28/09/2026', encerrada=True)

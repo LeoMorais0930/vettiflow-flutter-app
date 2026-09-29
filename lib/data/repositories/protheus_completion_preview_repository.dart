@@ -9,6 +9,7 @@ abstract class ProtheusCompletionPreviewRepository {
     String op, {
     String filial = '04',
     num? quantidade,
+    String? armazem,
   });
 }
 
@@ -21,6 +22,7 @@ class EmptyProtheusCompletionPreviewRepository
     String op, {
     String filial = '04',
     num? quantidade,
+    String? armazem,
   }) async {
     return ProtheusCompletionPreviewSnapshot(
       op: op.trim(),
@@ -40,7 +42,7 @@ class ApiProtheusCompletionPreviewRepository
     this.apiToken = '',
     http.Client? httpClient,
   }) : baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), ''),
-       _http = httpClient ?? http.Client();
+       _http = httpClient ?? ApiSettings.createClient();
 
   final String baseUrl;
   final String apiToken;
@@ -53,6 +55,7 @@ class ApiProtheusCompletionPreviewRepository
     String op, {
     String filial = '04',
     num? quantidade,
+    String? armazem,
   }) async {
     final normalized = op.trim().toUpperCase();
     if (normalized.isEmpty) {
@@ -69,6 +72,8 @@ class ApiProtheusCompletionPreviewRepository
     final query = {
       'filial': filial,
       if (quantidade != null) 'quantidade': '$quantidade',
+      if (armazem != null && armazem.trim().isNotEmpty)
+        'armazem': armazem.trim().toUpperCase(),
     };
     final response = await _http
         .get(

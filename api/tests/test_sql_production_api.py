@@ -44,7 +44,9 @@ def test_authentication_is_separate_from_read_access(client, db):
                                       ('MSSQL_SCHEMA', 'other'), ('EMPRESA', '999')])
 def test_configuration_blocks_real_write(client, monkeypatch, db, name, value):
     monkeypatch.setattr(config, name, value)
-    assert client.post(URL, json=body(), headers=HEADERS).status_code == 503
+    # Trocar filial invalida a sessão antes de chegar à política SQL.
+    expected = 401 if name == 'FILIAL_PADRAO' else 503
+    assert client.post(URL, json=body(), headers=HEADERS).status_code == expected
     assert not db.rows('SC2')
 
 

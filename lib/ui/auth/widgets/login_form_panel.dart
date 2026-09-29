@@ -23,7 +23,6 @@ class LoginFormPanel extends StatefulWidget {
 
 class _LoginFormPanelState extends State<LoginFormPanel> {
   bool _obscurePassword = true;
-  bool _keepConnected = true;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +46,7 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Use suas credenciais corporativas para continuar no Vetti Flow.',
+                'Entre com seu usuário e senha do Protheus.',
                 style: TextStyle(
                   color: AppColors.muted,
                   fontSize: 14,
@@ -123,12 +122,6 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
                 ),
               ),
               const SizedBox(height: 18),
-              _KeepConnectedRow(
-                value: _keepConnected,
-                onChanged: (value) {
-                  setState(() => _keepConnected = value ?? false);
-                },
-              ),
               if (widget.loginError != null) ...[
                 const SizedBox(height: 14),
                 Container(
@@ -233,46 +226,6 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
   }
 }
 
-class _KeepConnectedRow extends StatelessWidget {
-  const _KeepConnectedRow({required this.value, required this.onChanged});
-
-  final bool value;
-  final ValueChanged<bool?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 24,
-          height: 24,
-          child: Checkbox(
-            value: value,
-            onChanged: onChanged,
-            activeColor: AppColors.primary,
-            side: const BorderSide(color: Color(0xFFB7CAD6)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(5),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        const Expanded(
-          child: Text(
-            'Manter conectado neste dispositivo',
-            style: TextStyle(
-              color: AppColors.label,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              height: 1.25,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _SecurityNote extends StatelessWidget {
   const _SecurityNote();
 
@@ -285,7 +238,7 @@ class _SecurityNote extends StatelessWidget {
         SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Acesso restrito a colaboradores autorizados.',
+            'Sua senha é validada pelo Protheus. A sessão é encerrada ao expirar ou ao fechar o app.',
             style: TextStyle(
               color: AppColors.smallText,
               fontSize: 12,

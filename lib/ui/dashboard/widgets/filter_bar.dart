@@ -4,6 +4,14 @@ import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
 import 'package:vetti_flow_1_0/ui/dashboard/cubit/dashboard_state.dart';
 
 class FilterBar extends StatelessWidget {
+  final Map<String, String> periodOptions;
+  final List<String> sectors;
+  final String filtroSetor;
+  final String filtroSituacao;
+  final ValueChanged<String>? onSituacao;
+  final bool mostrarConcluidas;
+  final ValueChanged<String>? onSetor;
+  final ValueChanged<bool>? onMostrarConcluidas;
   final String busca;
   final String filtroPeriodo;
   final String filtroResponsavel;
@@ -22,6 +30,14 @@ class FilterBar extends StatelessWidget {
 
   const FilterBar({
     super.key,
+    this.periodOptions = const {'todos': 'Todo o histórico'},
+    this.sectors = const [],
+    this.filtroSetor = 'todos',
+    this.filtroSituacao = 'todas',
+    this.onSituacao,
+    this.mostrarConcluidas = true,
+    this.onSetor,
+    this.onMostrarConcluidas,
     required this.busca,
     required this.filtroPeriodo,
     required this.filtroResponsavel,
@@ -54,12 +70,14 @@ class FilterBar extends StatelessWidget {
           children: [
             _SearchField(value: busca, onChanged: onBusca),
             ExpansionTile(
+              shape: const Border(),
+              collapsedShape: const Border(),
               title: const Text('Filtros'),
               subtitle: Text(
-                hasActiveFilters ? 'Filtros aplicados' : 'Todas as OPs',
+                '${periodOptions[filtroPeriodo] ?? filtroPeriodo} · ${filtroSetor == 'todos' ? 'Todos os setores' : filtroSetor}',
               ),
               tilePadding: EdgeInsets.zero,
-              childrenPadding: const EdgeInsets.only(bottom: 12),
+              childrenPadding: const EdgeInsets.only(top: 8, bottom: 16),
               children: [
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -70,16 +88,50 @@ class FilterBar extends StatelessWidget {
                       spacing: 12,
                       runSpacing: 12,
                       children: [
+                        if (onSituacao != null)
+                          SizedBox(
+                            width: width,
+                            child: _Dropdown(
+                              label: 'Situação',
+                              value: filtroSituacao,
+                              items: const {
+                                'todas': 'Todas',
+                                'abertas': 'Em aberto',
+                                'encerradas_erp': 'Encerradas no Protheus',
+                                'concluidas_painel': 'Concluídas no painel',
+                              },
+                              onChanged: onSituacao!,
+                            ),
+                          ),
+                        if (onSetor != null)
+                          SizedBox(
+                            width: width,
+                            child: _Dropdown(
+                              label: 'Setor cadastrado',
+                              value: filtroSetor,
+                              items: {
+                                'todos': 'Todos os setores',
+                                for (final sector in sectors) sector: sector,
+                              },
+                              onChanged: onSetor!,
+                            ),
+                          ),
+                        if (onMostrarConcluidas != null)
+                          SizedBox(
+                            width: width,
+                            child: SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Mostrar concluídas'),
+                              value: mostrarConcluidas,
+                              onChanged: onMostrarConcluidas,
+                            ),
+                          ),
                         SizedBox(
                           width: width,
                           child: _Dropdown(
                             label: 'Período',
                             value: filtroPeriodo,
-                            items: const {
-                              'todos': 'Todos os períodos',
-                              'jun': 'Junho 2026',
-                              'mai': 'Maio 2026',
-                            },
+                            items: periodOptions,
                             onChanged: onPeriodo,
                           ),
                         ),
@@ -113,8 +165,19 @@ class FilterBar extends StatelessWidget {
                 ),
               ],
             ),
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                'Período: encerramento para OPs encerradas no ERP; emissão para as demais.',
+                style: TextStyle(fontSize: 12, color: AppColors.muted),
+              ),
+            ),
             const SizedBox(height: 10),
-            Row(
+            Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 10,
               children: [
                 if (hasActiveFilters)
                   TextButton(
@@ -133,19 +196,12 @@ class FilterBar extends StatelessWidget {
                     ),
                     child: const Text('Limpar filtros'),
                   ),
-                const Spacer(),
                 Text(
                   resultText,
                   style: const TextStyle(
                     fontSize: 12.5,
                     color: AppColors.muted,
                   ),
-                ),
-                Container(
-                  width: 1,
-                  height: 24,
-                  color: AppColors.border,
-                  margin: const EdgeInsets.symmetric(horizontal: 8),
                 ),
                 _ViewToggle(mode: viewMode, onChanged: onViewMode),
               ],
@@ -238,40 +294,52 @@ class _Dropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InputDecorator(
-      decoration: InputDecoration(
-        labelText: label,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 12,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: AppColors.muted),
         ),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isDense: true,
-          isExpanded: true,
-          selectedItemBuilder: (context) => [
-            for (final text in items.values)
-              Tooltip(
-                message: text,
-                child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
-              ),
-          ],
-          icon: const Icon(Icons.keyboard_arrow_down, size: 18),
-          style: GoogleFonts.ibmPlexSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
+        const SizedBox(height: 6),
+        InputDecorator(
+          decoration: const InputDecoration(
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
-          items: items.entries
-              .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-              .toList(),
-          onChanged: (v) {
-            if (v != null) onChanged(v);
-          },
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isDense: true,
+              isExpanded: true,
+              selectedItemBuilder: (context) => [
+                for (final text in items.values)
+                  Tooltip(
+                    message: text,
+                    child: Text(
+                      text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              icon: const Icon(Icons.keyboard_arrow_down, size: 18),
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+              items: items.entries
+                  .map(
+                    (e) => DropdownMenuItem(value: e.key, child: Text(e.value)),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) onChanged(v);
+              },
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }

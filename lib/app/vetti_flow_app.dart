@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:vetti_flow_1_0/data/repositories/api_settings.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_auth_session.dart';
+import 'package:vetti_flow_1_0/shared/models/operator_access.dart';
+import 'package:vetti_flow_1_0/ui/auth/session_page.dart';
 import 'package:vetti_flow_1_0/data/repositories/sql_production_repository.dart';
 import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/app/app_routes.dart';
-import 'package:vetti_flow_1_0/data/repositories/flow_op_repository.dart';
+import 'package:vetti_flow_1_0/data/repositories/erp_dashboard_repository.dart';
 import 'package:vetti_flow_1_0/data/repositories/mutation_sync_service.dart';
 import 'package:vetti_flow_1_0/data/repositories/op_repository.dart';
 import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
@@ -38,6 +42,9 @@ class VettiFlowApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<ProtheusAuthSession>.value(
+          value: ApiSettings.session,
+        ),
         Provider<SqlProductionRepository>(
           create: (_) => SqlProductionRepository(
             baseUrl: _apiBaseUrl,
@@ -145,21 +152,55 @@ class VettiFlowApp extends StatelessWidget {
           WarehouseRequestStore,
           OpRepository
         >(
-          update: (_, flowStore, protheusProducts, warehouseRequests, _) =>
-              FlowOpRepository(
-                flowStore,
-                protheusProducts: protheusProducts,
-                warehouseRequests: warehouseRequests,
-              ),
+          update:
+              (_, flowStore, protheusProducts, warehouseRequests, previous) =>
+                  previous ??
+                  ErpDashboardRepository(
+                    flowStore,
+                    baseUrl: _apiBaseUrl,
+                    protheusProducts: protheusProducts,
+                    warehouseRequests: warehouseRequests,
+                  ),
+          dispose: (_, repository) {
+            if (repository is ErpDashboardRepository) repository.close();
+          },
         ),
       ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'VettiFlow',
-        theme: AppTheme.light,
-        initialRoute: '/login',
-        routes: vettiFlowRoutes(),
+      child: const _SessionApp(),
+    );
+  }
+}
+
+class _SessionApp extends StatelessWidget {
+  const _SessionApp();
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<ProtheusAuthSession>();
+    final operator = context.watch<OperatorAssignmentStore>().currentOperator;
+    final authenticated = auth.isAuthenticated;
+    return MaterialApp(
+      key: ValueKey(
+        authenticated ? 'signed-in:${auth.username}' : 'signed-out',
       ),
+      debugShowCheckedModeBanner: false,
+      title: 'VettiFlow',
+      theme: AppTheme.light,
+      initialRoute: authenticated
+          ? (operator?.homeRoute ?? '/conta')
+          : '/login',
+      routes: {
+        ...vettiFlowRoutes().map(
+          (route, builder) => MapEntry(
+            route,
+            (context) => !authenticated && route != '/login'
+                ? vettiFlowRoutes()['/login']!(context)
+                : builder(context),
+          ),
+        ),
+        '/conta': (_) => authenticated
+            ? const SessionPage()
+            : vettiFlowRoutes()['/login']!(context),
+      },
     );
   }
 }

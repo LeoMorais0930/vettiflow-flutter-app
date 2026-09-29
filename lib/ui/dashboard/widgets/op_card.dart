@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vetti_flow_1_0/data/models/dashboard_order_groups.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:vetti_flow_1_0/data/models/ordem_producao.dart';
 import 'package:vetti_flow_1_0/data/models/responsavel.dart';
@@ -69,6 +70,56 @@ class OpCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
+                if (op.erpReadOnly) ...[
+                  Text(
+                    'Setor: ${erpOrderSectorLabel(op.armazem)}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  if (op.execution != null) ...[
+                    Text(
+                      '${op.execution!.stage.label} · ${op.execution!.statusLabel}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: op.execution!.status == 'paused'
+                            ? Colors.deepOrange
+                            : AppColors.textStrong,
+                      ),
+                    ),
+                    Text(
+                      'Último registro: ${op.execution!.actor}',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    if (op.execution!.status == 'paused' &&
+                        op.execution!.note.isNotEmpty)
+                      Text(
+                        'Motivo: ${op.execution!.note}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                  ] else if (!op.encerradaNoErp)
+                    const Text(
+                      'Sem execução registrada',
+                      style: TextStyle(fontSize: 11, color: AppColors.textWeak),
+                    ),
+                  const SizedBox(height: 8),
+                ],
+                if (op.status == StatusOP.finalizada)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      op.conclusaoLabel,
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 Text(
                   op.produto,
                   style: const TextStyle(
@@ -123,7 +174,9 @@ class OpCard extends StatelessWidget {
                 ],
                 const SizedBox(height: 8),
                 Text(
-                  op.prazoLabel,
+                  op.encerradaNoErp
+                      ? 'Encerramento ${op.dataEncerramento}'
+                      : op.prazoLabel,
                   style: TextStyle(fontSize: 11.5, color: AppColors.textWeak),
                 ),
               ],

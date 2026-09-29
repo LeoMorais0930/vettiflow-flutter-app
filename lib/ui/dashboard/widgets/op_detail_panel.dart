@@ -1,3 +1,5 @@
+import 'flow_tracking_card.dart';
+import 'package:vetti_flow_1_0/data/models/dashboard_order_groups.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,6 +18,7 @@ import 'package:vetti_flow_1_0/shared/theme/app_colors.dart';
 
 class OpDetailPanel extends StatelessWidget {
   final OrdemProducao op;
+  final VoidCallback? onExecutionChanged;
   final bool confirmCancel;
   final VoidCallback onClose;
   final void Function({int quantidadeArmazenada}) onAdvance;
@@ -33,6 +36,7 @@ class OpDetailPanel extends StatelessWidget {
   const OpDetailPanel({
     super.key,
     required this.op,
+    this.onExecutionChanged,
     required this.confirmCancel,
     required this.onClose,
     required this.onAdvance,
@@ -71,7 +75,10 @@ class _DesktopDrawer extends StatelessWidget {
           child: GestureDetector(
             onTap: () {},
             child: Container(
-              width: 500,
+              width: (MediaQuery.sizeOf(context).width * 0.62).clamp(
+                560.0,
+                900.0,
+              ),
               height: double.infinity,
               decoration: const BoxDecoration(
                 color: AppColors.surface,
@@ -83,7 +90,10 @@ class _DesktopDrawer extends StatelessWidget {
                   ),
                 ],
               ),
-              child: _DetailContent(panel: panel, showBackArrow: false),
+              child: Material(
+                color: AppColors.surface,
+                child: _DetailContent(panel: panel, showBackArrow: false),
+              ),
             ),
           ),
         ),
@@ -99,19 +109,27 @@ class _MobileFullScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Material(
       color: AppColors.background,
       child: _DetailContent(panel: panel, showBackArrow: true),
     );
   }
 }
 
-class _DetailContent extends StatelessWidget {
+class _DetailContent extends StatefulWidget {
   final OpDetailPanel panel;
   final bool showBackArrow;
 
   const _DetailContent({required this.panel, required this.showBackArrow});
 
+  @override
+  State<_DetailContent> createState() => _DetailContentState();
+}
+
+class _DetailContentState extends State<_DetailContent> {
+  bool _showMod = false;
+  OpDetailPanel get panel => widget.panel;
+  bool get showBackArrow => widget.showBackArrow;
   OrdemProducao get op => panel.op;
 
   @override
@@ -129,103 +147,85 @@ class _DetailContent extends StatelessWidget {
         ? 'Concluir e expedir'
         : 'Avançar p/ ${flow[stageIdx + 1].label}';
 
-    return Column(
-      children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            border: Border(bottom: BorderSide(color: AppColors.borderLight)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (showBackArrow) ...[
-                    _IconButton(
-                      icon: Icons.arrow_back_ios_new_rounded,
-                      onTap: panel.onClose,
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
-                    child: Text(
-                      op.numero,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.ibmPlexMono(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textMuted,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  if (!showBackArrow)
-                    _IconButton(icon: Icons.close, onTap: panel.onClose)
-                  else
-                    _StatusBadge(status: op.status),
-                ],
-              ),
-              const SizedBox(height: 11),
-              Text(
-                op.produto,
-                maxLines: showBackArrow ? 3 : 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.text,
-                ),
-              ),
-              const SizedBox(height: 11),
-              if (!showBackArrow)
+    return _ModDisplay(
+      show: _showMod,
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(bottom: BorderSide(color: AppColors.borderLight)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Row(
                   children: [
-                    _StatusBadge(status: op.status),
-                    if (op.prioridadeAlta) ...[
-                      const SizedBox(width: 9),
-                      const _PriorityBadge(),
+                    if (showBackArrow) ...[
+                      _IconButton(
+                        icon: Icons.arrow_back_ios_new_rounded,
+                        onTap: panel.onClose,
+                      ),
+                      const SizedBox(width: 12),
                     ],
-                    if (op.atrasada) ...[
-                      const SizedBox(width: 9),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.dangerBg,
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                        child: const Text(
-                          'Atrasada',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.danger,
-                          ),
+                    Expanded(
+                      child: Text(
+                        op.numero,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.ibmPlexMono(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textMuted,
+                          letterSpacing: 0,
                         ),
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: 10),
+                    if (!showBackArrow)
+                      _IconButton(icon: Icons.close, onTap: panel.onClose)
+                    else
+                      _StatusBadge(
+                        status: op.status,
+                        label: op.status == StatusOP.finalizada
+                            ? op.conclusaoLabel
+                            : null,
+                      ),
                   ],
                 ),
-              if (showBackArrow && (op.prioridadeAlta || op.atrasada))
-                Padding(
-                  padding: const EdgeInsets.only(top: 9),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                const SizedBox(height: 11),
+                Text(
+                  op.produto,
+                  maxLines: showBackArrow ? 3 : 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.text,
+                  ),
+                ),
+                const SizedBox(height: 11),
+                if (!showBackArrow)
+                  Row(
                     children: [
-                      if (op.prioridadeAlta) const _PriorityBadge(),
-                      if (op.atrasada)
+                      _StatusBadge(
+                        status: op.status,
+                        label: op.status == StatusOP.finalizada
+                            ? op.conclusaoLabel
+                            : null,
+                      ),
+                      if (op.prioridadeAlta) ...[
+                        const SizedBox(width: 9),
+                        const _PriorityBadge(),
+                      ],
+                      if (op.atrasada) ...[
+                        const SizedBox(width: 9),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
-                            vertical: 4,
+                            vertical: 5,
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.dangerBg,
@@ -240,88 +240,149 @@ class _DetailContent extends StatelessWidget {
                             ),
                           ),
                         ),
+                      ],
                     ],
                   ),
-                ),
-            ],
+                if (showBackArrow && (op.prioridadeAlta || op.atrasada))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 9),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (op.prioridadeAlta) const _PriorityBadge(),
+                        if (op.atrasada)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.dangerBg,
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: const Text(
+                              'Atrasada',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.danger,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
 
-        // Scrollable content
-        Expanded(
-          child: panel.confirmCancel
-              ? SingleChildScrollView(
-                  padding: EdgeInsets.all(showBackArrow ? 16 : 20),
-                  child: _CancelConfirm(
-                    op: op,
-                    onConfirm: panel.onConfirmCancel,
-                    onBack: panel.onCancelNo,
-                  ),
-                )
-              : SingleChildScrollView(
-                  padding: EdgeInsets.all(showBackArrow ? 16 : 20),
-                  child: Column(
-                    children: [
-                      _InfoCard(op: op, resp: resp),
-                      SizedBox(height: showBackArrow ? 18 : 24),
-                      _RoutingCard(op: op),
-                      SizedBox(height: showBackArrow ? 18 : 24),
-                      _OfficialMovementsCard(op: op),
-                      SizedBox(height: showBackArrow ? 18 : 24),
-                      _CompletionPreviewCard(op: op),
-                      SizedBox(height: showBackArrow ? 18 : 24),
-                      _OfficialTransfersCard(op: op),
-                      SizedBox(height: showBackArrow ? 18 : 24),
-                      _StagesCard(
-                        op: op,
-                        canEdit: panel.canEdit,
-                        onUpdateRoute: panel.onUpdateRoute,
-                      ),
-                      SizedBox(height: showBackArrow ? 18 : 24),
-                      _SignatureAuditCard(op: op),
-                      SizedBox(height: showBackArrow ? 18 : 24),
-                      if (panel.showSensitiveDetails) ...[
-                        _MaterialsCard(op: op),
-                        SizedBox(height: showBackArrow ? 18 : 24),
-                        _PausasTempoCard(op: op),
-                      ] else
-                        const _RestrictedDetailsCard(),
-                    ],
-                  ),
-                ),
-        ),
-
-        // Actions
-        if (!panel.confirmCancel)
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: showBackArrow ? 16 : 22,
-              vertical: showBackArrow ? 13 : 14,
-            ),
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              border: Border(top: BorderSide(color: AppColors.borderLight)),
-            ),
-            child: !panel.canEdit
-                ? _ReadOnlyActions(
-                    message: panel.readOnlyMessage,
-                    onClose: panel.onClose,
-                    isDesktop: !showBackArrow,
+          // Scrollable content
+          Expanded(
+            child: panel.confirmCancel
+                ? SingleChildScrollView(
+                    padding: EdgeInsets.all(showBackArrow ? 16 : 20),
+                    child: _CancelConfirm(
+                      op: op,
+                      onConfirm: panel.onConfirmCancel,
+                      onBack: panel.onCancelNo,
+                    ),
                   )
-                : _ActionButtons(
-                    canAdvance: canAdvance,
-                    isDone: isDone,
-                    canRegress: canRegress,
-                    actionLabel: advanceLabel,
-                    op: op,
-                    onAdvance: panel.onAdvance,
-                    onRegress: panel.onRegress,
-                    onAskCancel: panel.onAskCancel,
-                    onClose: panel.onClose,
-                    isDesktop: !showBackArrow,
+                : SingleChildScrollView(
+                    padding: EdgeInsets.all(showBackArrow ? 16 : 20),
+                    child: Column(
+                      children: [
+                        _InfoCard(op: op, resp: resp),
+                        SizedBox(height: showBackArrow ? 18 : 24),
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Mostrar MOD (mão de obra)'),
+                          subtitle: const Text(
+                            'Separado dos materiais físicos; não exige saldo de estoque.',
+                          ),
+                          value: _showMod,
+                          onChanged: (v) => setState(() => _showMod = v),
+                        ),
+                        if (op.observacao?.isNotEmpty == true)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Text(op.observacao!),
+                          ),
+                        if (op.erpKey != null)
+                          _DetailSection(
+                            title: 'Execução da etapa',
+                            builder: () => FlowTrackingCard(
+                              key: ValueKey(op.erpKey.toString()),
+                              op: op,
+                              onChanged: panel.onExecutionChanged,
+                            ),
+                          ),
+                        if (!op.erpReadOnly) _RoutingCard(op: op),
+                        _DetailSection(
+                          title: 'Movimentos oficiais',
+                          builder: () => _OfficialMovementsCard(op: op),
+                        ),
+                        _DetailSection(
+                          title: 'Prévia de apontamento e materiais',
+                          builder: () => _CompletionPreviewCard(op: op),
+                        ),
+                        _DetailSection(
+                          title: 'Transferências',
+                          builder: () => _OfficialTransfersCard(op: op),
+                        ),
+                        if (!op.erpReadOnly) ...[
+                          _StagesCard(
+                            op: op,
+                            canEdit: panel.canEdit,
+                            onUpdateRoute: panel.onUpdateRoute,
+                          ),
+                          SizedBox(height: showBackArrow ? 18 : 24),
+                          _SignatureAuditCard(op: op),
+                          SizedBox(height: showBackArrow ? 18 : 24),
+                          if (panel.showSensitiveDetails) ...[
+                            _MaterialsCard(op: op),
+                            SizedBox(height: showBackArrow ? 18 : 24),
+                            _PausasTempoCard(op: op),
+                          ] else
+                            const _RestrictedDetailsCard(),
+                        ],
+                      ],
+                    ),
                   ),
           ),
-      ],
+
+          // Actions
+          if (!panel.confirmCancel)
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: showBackArrow ? 16 : 22,
+                vertical: showBackArrow ? 13 : 14,
+              ),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(top: BorderSide(color: AppColors.borderLight)),
+              ),
+              child: !panel.canEdit
+                  ? _ReadOnlyActions(
+                      message: panel.readOnlyMessage,
+                      onClose: panel.onClose,
+                      isDesktop: !showBackArrow,
+                    )
+                  : _ActionButtons(
+                      canAdvance: canAdvance,
+                      isDone: isDone,
+                      canRegress: canRegress,
+                      actionLabel: advanceLabel,
+                      op: op,
+                      onAdvance: panel.onAdvance,
+                      onRegress: panel.onRegress,
+                      onAskCancel: panel.onAskCancel,
+                      onClose: panel.onClose,
+                      isDesktop: !showBackArrow,
+                    ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -422,10 +483,20 @@ class _OfficialMovementsCardState extends State<_OfficialMovementsCard> {
                   _OfficialWarning(text: warning),
                 ],
                 const SizedBox(height: 10),
-                for (var i = 0; i < data.movimentos.length; i++) ...[
-                  _OfficialMovementRow(movement: data.movimentos[i]),
-                  if (i < data.movimentos.length - 1)
+                for (final movement in data.movimentos.where(
+                  (m) => !_isMod(m.produto),
+                )) ...[
+                  _OfficialMovementRow(movement: movement),
+                  const Divider(height: 18, color: AppColors.borderLight),
+                ],
+                if (_ModDisplay.of(context)) ...[
+                  const _SectionLabel('MOD · MÃO DE OBRA'),
+                  for (final movement in data.movimentos.where(
+                    (m) => _isMod(m.produto),
+                  )) ...[
+                    _OfficialMovementRow(movement: movement),
                     const Divider(height: 18, color: AppColors.borderLight),
+                  ],
                 ],
               ],
             ],
@@ -554,12 +625,44 @@ class _CompletionPreviewCard extends StatefulWidget {
 class _CompletionPreviewCardState extends State<_CompletionPreviewCard> {
   Future<ProtheusCompletionPreviewSnapshot>? _future;
 
+  /// Armazem do acabado. Como na MATA250: vem sugerido e aceita edicao.
+  final _armazem = TextEditingController();
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _future ??= context
+    _future ??= _simular();
+  }
+
+  @override
+  void dispose() {
+    _armazem.dispose();
+    super.dispose();
+  }
+
+  Future<ProtheusCompletionPreviewSnapshot>? _simular([String? armazem]) {
+    return context
         .read<ProtheusCompletionPreviewRepository?>()
-        ?.fetchPreview(widget.op.numero, quantidade: widget.op.qtd);
+        ?.fetchPreview(
+          widget.op.numero,
+          quantidade: widget.op.qtd,
+          armazem: armazem,
+        )
+        .then((data) {
+          if (mounted) {
+            _armazem.text = data.armazemInformado.isNotEmpty
+                ? data.armazemInformado
+                : data.armazemPadrao;
+          }
+          return data;
+        });
+  }
+
+  void _resimular(String? armazem) {
+    final future = _simular(armazem);
+    setState(() {
+      _future = future;
+    });
   }
 
   @override
@@ -622,27 +725,123 @@ class _CompletionPreviewCardState extends State<_CompletionPreviewCard> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                for (final movement in data.movimentosPrevistos) ...[
+                _FinishedWarehouseField(
+                  controller: _armazem,
+                  padrao: data.armazemPadrao,
+                  editado:
+                      data.armazemInformado.isNotEmpty &&
+                      data.armazemInformado != data.armazemPadrao,
+                  onSimular: () => _resimular(_armazem.text),
+                  onRestaurar: () => _resimular(null),
+                ),
+                const SizedBox(height: 10),
+                for (final movement in data.movimentosPrevistos.where(
+                  (m) => !_isMod(m.produto),
+                )) ...[
                   _CompletionPreviewMovementRow(movement: movement),
                   const SizedBox(height: 8),
                 ],
-                for (final balance in data.saldosComponentes) ...[
+                for (final balance in data.saldosComponentes.where(
+                  (m) => !_isMod(m.produto),
+                )) ...[
                   _CompletionBalanceRow(balance: balance),
                   const SizedBox(height: 8),
+                ],
+                if (_ModDisplay.of(context)) ...[
+                  const _SectionLabel('MOD · MÃO DE OBRA'),
+                  const Text(
+                    'Custo de mão de obra: sem validação de saldo físico.',
+                  ),
+                  for (final movement in data.movimentosPrevistos.where(
+                    (m) => _isMod(m.produto),
+                  ))
+                    _CompletionPreviewMovementRow(movement: movement),
                 ],
                 for (final warning in data.divergencias) ...[
                   _OfficialWarning(text: warning),
                   const SizedBox(height: 8),
                 ],
-                for (final pending in data.pendenciasPesquisa) ...[
-                  _OfficialWarning(text: pending),
-                  const SizedBox(height: 8),
-                ],
+                Material(
+                  color: Colors.transparent,
+                  child: ExpansionTile(
+                    title: const Text('Detalhes técnicos da integração'),
+                    children: [
+                      for (final pending in data.pendenciasPesquisa)
+                        _OfficialWarning(text: pending),
+                    ],
+                  ),
+                ),
               ],
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _FinishedWarehouseField extends StatelessWidget {
+  const _FinishedWarehouseField({
+    required this.controller,
+    required this.padrao,
+    required this.editado,
+    required this.onSimular,
+    required this.onRestaurar,
+  });
+
+  final TextEditingController controller;
+  final String padrao;
+  final bool editado;
+  final VoidCallback onSimular;
+  final VoidCallback onRestaurar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        const Text(
+          'Armazem do acabado',
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textStrong,
+          ),
+        ),
+        SizedBox(
+          width: 64,
+          child: TextField(
+            key: const ValueKey('completion-preview-armazem'),
+            controller: controller,
+            maxLength: 2,
+            textCapitalization: TextCapitalization.characters,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.ibmPlexMono(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: const InputDecoration(
+              counterText: '',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => onSimular(),
+          ),
+        ),
+        TextButton(onPressed: onSimular, child: const Text('Simular')),
+        if (editado)
+          TextButton(
+            onPressed: onRestaurar,
+            child: Text('Voltar ao sugerido ($padrao)'),
+          )
+        else if (padrao.isNotEmpty)
+          Text(
+            'Sugerido pelo Protheus: $padrao',
+            style: const TextStyle(fontSize: 12, color: AppColors.muted),
+          ),
+      ],
     );
   }
 }
@@ -906,7 +1105,15 @@ class _OfficialTotals extends StatelessWidget {
       children: [
         if (ordem != null) _AuditChip(label: 'SC2 local ${ordem.local}'),
         _AuditChip(label: 'PR0 ${_qty(snapshot.totalProduzido)}'),
-        _AuditChip(label: 'RE1 ${_qty(snapshot.totalConsumido)}'),
+        _AuditChip(
+          label:
+              '${snapshot.movimentos.where((m) => m.cf == 'RE1' && !_isMod(m.produto)).length} consumos de materiais',
+        ),
+        if (_ModDisplay.of(context))
+          _AuditChip(
+            label:
+                '${snapshot.movimentos.where((m) => _isMod(m.produto)).length} registros MOD',
+          ),
         if (snapshot.hasReversal) _AuditChip(label: 'Estorno detectado'),
         _AuditChip(label: '${snapshot.empenhos.length} empenho(s) SD4'),
       ],
@@ -1059,12 +1266,14 @@ class _InfoCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                       ],
-                      Text(
-                        op.responsavel,
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textStrong,
+                      Expanded(
+                        child: Text(
+                          op.responsavel,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textStrong,
+                          ),
                         ),
                       ),
                     ],
@@ -1143,6 +1352,16 @@ class _StagesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (op.erpReadOnly) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Setor cadastrado: ${erpOrderSectorLabel(op.armazem)}.\nEtapa operacional não informada pelo ERP. O armazém da OP não comprova sua etapa física atual.',
+          ),
+        ),
+      );
+    }
     const flow = ProductionStage.productionFlow;
     final route = op.plannedStages.isEmpty
         ? flow.toList()
@@ -2886,8 +3105,9 @@ class _IconButton extends StatelessWidget {
 
 class _StatusBadge extends StatelessWidget {
   final StatusOP status;
+  final String? label;
 
-  const _StatusBadge({required this.status});
+  const _StatusBadge({required this.status, this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -2910,7 +3130,7 @@ class _StatusBadge extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            status.label,
+            label ?? status.label,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -2992,4 +3212,38 @@ class _SectionLabel extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _isMod(String product) => product.trim().toUpperCase().startsWith('MOD');
+
+class _ModDisplay extends InheritedWidget {
+  const _ModDisplay({required this.show, required super.child});
+  final bool show;
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_ModDisplay>()?.show ?? false;
+  @override
+  bool updateShouldNotify(_ModDisplay oldWidget) => show != oldWidget.show;
+}
+
+class _DetailSection extends StatefulWidget {
+  const _DetailSection({required this.title, required this.builder});
+  final String title;
+  final Widget Function() builder;
+  @override
+  State<_DetailSection> createState() => _DetailSectionState();
+}
+
+class _DetailSectionState extends State<_DetailSection> {
+  bool _expanded = false;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: ExpansionTile(
+      title: Text(widget.title),
+      shape: const Border(),
+      collapsedShape: const Border(),
+      onExpansionChanged: (v) => setState(() => _expanded = v),
+      children: [if (_expanded) widget.builder()],
+    ),
+  );
 }

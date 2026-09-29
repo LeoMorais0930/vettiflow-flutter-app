@@ -65,6 +65,26 @@ WRITE_LEDGER = Path(os.getenv(
 ))
 
 
+# Fila de solicitações consumida pelo ADVPL (plano ADVPL de 28/09/2026).
+# Nada é gravado no ERP por aqui: a API só guarda o pedido e lê para conferir.
+QUEUE_ENABLED = os.getenv("VF_QUEUE_ENABLED", "false").lower() == "true"
+QUEUE_EXECUTION_ENABLED = os.getenv("VF_QUEUE_EXECUTION_ENABLED", "false").lower() == "true"
+QUEUE_OPERATIONS = _csv_env("VF_QUEUE_OPERATIONS", ["abertura_op"])
+QUEUE_CONSUMER_TOKEN = os.getenv("VF_QUEUE_CONSUMER_TOKEN", "").strip()
+QUEUE_RESERVATION_MINUTES = int(os.getenv("VF_QUEUE_RESERVATION_MINUTES", "10"))
+QUEUE_DB = Path(
+    os.getenv("VF_QUEUE_DB", "").strip()
+    or Path(__file__).resolve().parents[1] / "data" / "solicitacoes.sqlite3"
+)
+
+
 def protheus_ssl_context() -> ssl.SSLContext:
     """Usa também as autoridades do Windows, mantendo cadeia e hostname validados."""
     return ssl.create_default_context()
+
+
+# Apontamentos do VettiFlow são independentes da base restaurada do ERP.
+import json as _json
+FLOW_DB = Path(os.getenv('VF_FLOW_DB', '').strip() or Path(__file__).resolve().parents[1] / 'data' / 'flow.sqlite3')
+FLOW_ADMIN_USERS = _csv_env('VF_FLOW_ADMIN_USERS', [])
+FLOW_STAGE_USERS = _json.loads(os.getenv('VF_FLOW_STAGE_USERS', '{}'))

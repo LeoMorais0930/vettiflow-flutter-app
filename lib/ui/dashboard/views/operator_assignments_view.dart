@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../widgets/flow_access_panel.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -75,6 +76,23 @@ class _OperatorAssignmentsViewState extends State<OperatorAssignmentsView> {
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const FlowAccessPanel(),
+        const SizedBox(height: 16),
+        ExpansionTile(
+          title: const Text('Atribuição local e solicitações'),
+          subtitle: const Text(
+            'A atribuição de telas não libera a execução de etapas.',
+          ),
+          children: [_buildAssignments(context)],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAssignments(BuildContext context) {
     final store = context.watch<OperatorAssignmentStore>();
     final requestStore = context.watch<WarehouseRequestStore>();
     final operators = store.visibleAssignableOperators;

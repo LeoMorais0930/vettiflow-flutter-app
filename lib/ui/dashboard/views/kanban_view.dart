@@ -1,3 +1,4 @@
+import 'package:vetti_flow_1_0/data/models/dashboard_order_groups.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:vetti_flow_1_0/data/models/ordem_producao.dart';
@@ -22,8 +23,14 @@ Color stageAccent(ProductionStage stage) {
 class KanbanView extends StatefulWidget {
   final List<OrdemProducao> ordens;
   final ValueChanged<String> onOpenOP;
+  final VoidCallback? onRefresh;
 
-  const KanbanView({super.key, required this.ordens, required this.onOpenOP});
+  const KanbanView({
+    super.key,
+    required this.ordens,
+    required this.onOpenOP,
+    this.onRefresh,
+  });
 
   @override
   State<KanbanView> createState() => _KanbanViewState();
@@ -31,6 +38,8 @@ class KanbanView extends StatefulWidget {
 
 class _KanbanViewState extends State<KanbanView> {
   final _scroll = ScrollController();
+  bool _executionView = false;
+  String _executionFilter = 'all';
 
   @override
   void dispose() {
@@ -40,11 +49,32 @@ class _KanbanViewState extends State<KanbanView> {
 
   @override
   Widget build(BuildContext context) {
-    const flow = ProductionStage.productionFlow;
+    if (widget.ordens.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(32),
+        child: Text(
+          'Nenhuma OP corresponde aos filtros. Altere o período ou limpe os filtros para consultar o histórico.',
+        ),
+      );
+    }
+    final selected = widget.ordens
+        .where(
+          (o) =>
+              !_executionView ||
+              _executionFilter == 'all' ||
+              (!o.encerradaNoErp &&
+                  (_executionFilter == 'waiting'
+                      ? o.execution == null
+                      : o.execution?.status == _executionFilter)),
+        )
+        .toList();
+    final flow = _executionView
+        ? executionOrderGroups(selected)
+        : dashboardOrderGroups(selected);
     return LayoutBuilder(
       builder: (context, constraints) {
         const gap = 14.0;
-        const minColumnWidth = 170.0;
+        const minColumnWidth = 210.0;
         final available = constraints.maxWidth.isFinite
             ? constraints.maxWidth
             : flow.length * minColumnWidth;
@@ -55,39 +85,102 @@ class _KanbanViewState extends State<KanbanView> {
         );
         final columnWidth = (contentWidth - totalGap) / flow.length;
 
-        return ScrollConfiguration(
-          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-          child: Scrollbar(
-            controller: _scroll,
-            thumbVisibility: contentWidth > available,
-            trackVisibility: contentWidth > available,
-            child: SingleChildScrollView(
-              controller: _scroll,
-              padding: const EdgeInsets.only(bottom: 14),
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: contentWidth,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var i = 0; i < flow.length; i++) ...[
-                      SizedBox(
-                        width: columnWidth,
-                        child: _KanbanColumn(
-                          stage: flow[i],
-                          items: widget.ordens
-                              .where((op) => op.stage == flow[i])
-                              .toList(),
-                          onOpenOP: widget.onOpenOP,
-                        ),
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('Setor Protheus'),
+                  selected: !_executionView,
+                  onSelected: (_) => setState(() => _executionView = false),
+                ),
+                ChoiceChip(
+                  label: const Text('Execução VettiFlow'),
+                  selected: _executionView,
+                  onSelected: (_) => setState(() => _executionView = true),
+                ),
+                if (widget.onRefresh != null)
+                  TextButton.icon(
+                    onPressed: widget.onRefresh,
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Atualizar painel'),
+                  ),
+              ],
+            ),
+            if (_executionView) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final entry in const {
+                    'all': 'Todas',
+                    'active': 'Em execução',
+                    'paused': 'Pausadas',
+                    'completed': 'Etapa concluída',
+                    'waiting': 'Sem registro',
+                  }.entries)
+                    ChoiceChip(
+                      label: Text(
+                        '${entry.value} (${widget.ordens.where((o) => entry.key == 'all' || (!o.encerradaNoErp && (entry.key == 'waiting' ? o.execution == null : o.execution?.status == entry.key))).length})',
                       ),
-                      if (i < flow.length - 1) const SizedBox(width: gap),
-                    ],
-                  ],
+                      selected: _executionFilter == entry.key,
+                      onSelected: (_) =>
+                          setState(() => _executionFilter = entry.key),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+            if (widget.ordens.any((o) => o.erpReadOnly))
+              Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text(
+                  _executionView
+                      ? 'Etapas registradas no VettiFlow. Concluir uma etapa não encerra a OP. Os filtros de período e setor continuam valendo.'
+                      : 'Agrupamento pelo armazém cadastrado na OP. Consulte Execução VettiFlow para acompanhar o trabalho registrado.',
+                ),
+              ),
+            ScrollConfiguration(
+              behavior: ScrollConfiguration.of(
+                context,
+              ).copyWith(scrollbars: false),
+              child: Scrollbar(
+                controller: _scroll,
+                thumbVisibility: contentWidth > available,
+                trackVisibility: contentWidth > available,
+                child: SingleChildScrollView(
+                  controller: _scroll,
+                  padding: const EdgeInsets.only(bottom: 14),
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: contentWidth,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (var i = 0; i < flow.length; i++) ...[
+                          SizedBox(
+                            width: columnWidth,
+                            child: _KanbanColumn(
+                              title: flow[i].title,
+                              stage: flow[i].stage,
+                              items: flow[i].orders,
+                              onOpenOP: widget.onOpenOP,
+                            ),
+                          ),
+                          if (i < flow.length - 1) const SizedBox(width: gap),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         );
       },
     );
@@ -95,11 +188,13 @@ class _KanbanViewState extends State<KanbanView> {
 }
 
 class _KanbanColumn extends StatelessWidget {
-  final ProductionStage stage;
+  final String title;
+  final ProductionStage? stage;
   final List<OrdemProducao> items;
   final ValueChanged<String> onOpenOP;
 
   const _KanbanColumn({
+    required this.title,
     required this.stage,
     required this.items,
     required this.onOpenOP,
@@ -125,14 +220,16 @@ class _KanbanColumn extends StatelessWidget {
                   width: 9,
                   height: 9,
                   decoration: BoxDecoration(
-                    color: stageAccent(stage),
+                    color: stage == null
+                        ? AppColors.muted
+                        : stageAccent(stage!),
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    stage.label,
+                    title,
                     style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
@@ -179,7 +276,9 @@ class _KanbanColumn extends StatelessWidget {
                 separatorBuilder: (_, index) => const SizedBox(height: 10),
                 itemBuilder: (_, i) => OpCard(
                   op: items[i],
-                  accentColor: stageAccent(stage),
+                  accentColor: stage == null
+                      ? AppColors.muted
+                      : stageAccent(stage!),
                   onTap: () => onOpenOP(items[i].numero),
                 ),
               ),

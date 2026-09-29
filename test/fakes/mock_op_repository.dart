@@ -282,7 +282,7 @@ class MockOpRepository implements OpRepository {
         OrdemArmazenada(
           numero: op.numero,
           produto: op.produto,
-          quantidadeOriginal: op.qtd,
+          quantidadeOriginal: op.qtd.toInt(),
           quantidadeArmazenada: quantidadeArmazenada.clamp(0, op.qtd),
           responsavel: op.responsavel,
           data: '25/06/2026',

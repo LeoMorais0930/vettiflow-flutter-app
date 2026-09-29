@@ -52,7 +52,99 @@ Documentacao interativa:
 http://localhost:8000/docs
 ```
 
+### Testar login no Protheus pelo Swagger
+
+Abra `/docs` localmente, expanda **Login Protheus — teste** e use
+`POST /api/v1/auth/protheus/test` → **Try it out**. Preencha `username` e
+`password` com sua conta Protheus e clique **Execute**. Se `VF_API_TOKEN`
+estiver configurado, use antes **Authorize** com esse token interno (não a senha ERP).
+A documentação dispensa esse token apenas em loopback; as operações permanecem protegidas.
+
+Configure `VF_PROTHEUS_REST_URL` com a raiz HTTPS do REST DEV.
+O diagnóstico chama `POST /api/oauth2/v1/token?grant_type=password`, com
+credenciais nos cabeçalhos, conforme o [contrato TOTVS](https://tdn.totvs.com/pages/viewpage.action?pageId=465383509).
+Não segue redirecionamentos nem desativa a verificação do certificado.
+
+`200` com `authenticated=true` confirma que o Protheus retornou token Bearer
+em uma resposta HTTP 200 ou 201; `upstreamStatus` preserva o status do ERP;
+`400` indica solicitação recusada; `401/403`, autenticação/acesso recusado;
+`502`, falha TLS/conexão ou resposta incompatível; `504`, timeout;
+`503`, configuração ausente/inválida. MFA requer integração adicional.
+Senhas e tokens não são persistidos nem devolvidos. Limpe os campos ou feche
+o Swagger após o teste. Não há sessão VettiFlow, execução de rotina ou
+confirmação de permissões de movimentação. A configuração da filial enviada
+também não comprova a base efetiva do servidor remoto.
+
 ## Configuracao
+
+### Sessão JWT obrigatória (29/09/2026)
+
+Todas as rotas de negócio agora exigem **Authorization: Bearer JWT**, inclusive
+em loopback e mesmo quando `VF_API_TOKEN` está vazio. Quando configurada, a
+chave `X-API-Token` continua sendo uma exigência adicional. As exceções são
+login/teste de login (precisam receber credenciais antes de ter JWT), preflight
+CORS e documentação local. A documentação não executa operações sem autenticação.
+
+No Swagger:
+
+1. **Authorize → APIKeyHeader**: informe a chave interna.
+2. Execute `POST /api/v1/auth/protheus/login` com usuário e senha.
+3. Copie o `access_token` retornado para **Authorize → ProtheusJWT**, sem prefixo Bearer.
+4. `GET /api/v1/auth/protheus/session` consulta a sessão local.
+   `POST /api/v1/auth/protheus/probe` faz uma leitura de metadados no REST DEV.
+5. `POST /api/v1/auth/protheus/logout` encerra a sessão nesta API.
+
+`/test` permanece somente diagnóstico e não registra sessão. `/login` devolve
+o token do Protheus ao usuário; não salva senha. O refresh_token fica apenas em memória para renovação. O servidor
+registra somente hash do token, login informado, destino e expiração em memória.
+Só aceita tokens obtidos diretamente pelo login HTTPS desta instância: não
+valida JWT arbitrário apenas decodificando seus campos. A assinatura do ERP
+não é verificada localmente por uma chave pública; a confiança é a resposta
+HTTPS do ERP e a correspondência exata do hash registrado. A expiração é o
+menor valor entre `exp`, `expires_in` e uma hora. Reiniciar a API exige novo login.
+Use **um worker**; múltiplos workers exigem armazenamento compartilhado de sessões.
+
+Logout é local, não revoga o JWT nos demais serviços Protheus. Bloqueios de conta
+ou revogação no ERP não são consultados a cada SELECT SQL; um 401 no probe
+encerra a sessão local. Privilégios por rotina/setor ainda precisam ser integrados:
+login válido não comprova autorização para escrita. O Flutter autentica pelo
+endpoint de login e injeta o Bearer nos clientes dos repositórios. Não há fallback
+para senha local na tela de entrada. JWT e senha não são persistidos; expiração,
+logout e HTTP 401 encerram o acesso à interface. Usuários sem vínculo de perfil
+veem apenas a tela de conta pendente; `leonardo.morais` foi vinculado ao perfil de
+administrador VettiFlow, sem alterar permissões ERP. O perfil local controla a
+interface e não substitui autorização por operação no servidor.
+
+Configure `VETTIFLOW_API_URL` e `VETTIFLOW_API_TOKEN` no build Flutter. A chave
+incluída no cliente web não é um segredo de usuário: a autenticação individual
+continua dependendo do JWT. Fora de localhost, o cliente exige HTTPS. Enquanto
+o contorno de horário do DEV estiver ativo, cada token tem janela local de cinco minutos, renovável pelo ERP até o limite absoluto de oito horas.
+
+O probe não mantém thread ERP aberta nem renova tokens. Acompanhe o monitor do
+**AppServer REST DEV**, não o P12OFICIAL. A requisição pode ser breve demais para
+aparecer no intervalo de atualização. Manter uma linha permanente no monitor
+exige suporte/configuração do ERP; não é consequência de conservar um JWT.
+Não foram alterados AppServer/RPO, habilitadas escritas ou criados jobs.
+
+#### Contorno temporário de relógio no DEV
+
+Para a configuração HMLp12/grupo 01/filial 04, `/login` pode reconhecer o caso
+observado: JWT recebido diretamente do ERP, `exp` vencido há no máximo 120 s,
+`iat` aproximadamente uma hora atrás e duração interna/`expires_in` de 3600 s.
+Nesse caso, antes de registrar a sessão, consulta os metadados de OP por HTTPS:
+um token inválido de controle precisa receber 401 e o token recebido precisa
+receber 200 com JSON. Não há soma de uma hora ao `exp` nem liberação offline.
+
+O retorno identifica `validationMode=protheus_online`. A sessão dura no máximo
+**5 minutos por token**, com renovação automática quando disponível; cada chamada protegida repete essa validação (duas leituras
+HTTP, sem cache). 401/403 do ERP revoga a sessão; timeout, resposta inesperada
+ou endpoint que aceite o controle inválido bloqueiam o acesso. Essa leitura
+confirma acesso ao endpoint consultado, não os privilégios de todas as rotinas.
+Fora desse caso específico a verificação de expiração original permanece.
+O contorno não corrige o relógio do AppServer, não mantém conexão no monitor
+e pode falhar se o próprio ERP recusar o JWT ou os metadados de OP.
+
+Os exemplos de consultas abaixo também precisam de `-H "Authorization: Bearer $PROTHEUS_JWT"`.
 
 | Variavel | Padrao | O que faz |
 |---|---|---|
@@ -158,3 +250,31 @@ Esse servidor fica em loopback e fixa o MIME de `.mjs` como `text/javascript`,
 necessário ao PDF.js; no Windows o `python -m http.server` genérico pode herdar
 `text/plain` do registro e impedir a prévia. A hospedagem definitiva precisa
 servir os módulos JavaScript com MIME apropriado.
+
+
+### Renovação e integração da fila (29/09/2026)
+
+O Flutter chama `POST /api/v1/auth/protheus/refresh` antes do vencimento.
+O refresh token retornado pelo ERP fica somente em memória na API, nunca no
+JSON entregue ao navegador. Cada renovação precisa ser aceita pelo Protheus;
+a sessão tem limite absoluto de oito horas desde o login. Logout impede
+renovações tardias de restabelecer o acesso. Reiniciar a API exige novo login.
+Sem refresh token, mantém-se a expiração original. Indisponibilidade de rede
+não amplia o prazo. O desvio de horário do DEV ainda precisa ser corrigido;
+a janela de cinco minutos permanece por token no modo online, com renovação.
+O transporte de refresh usa cabeçalhos, como o login instalado; precisa de
+validação real no REST DEV (os testes automatizados simulam o ERP).
+
+O dashboard usa `GET /api/v1/ops/abertas?filial=04` para OPs oficiais, apenas
+consulta. Quantidades produzidas vêm de C2_QUJE; não inferimos a etapa física
+da fábrica a partir dessa quantidade. Rascunhos locais continuam separados.
+
+Base da fila importada de `origin/developer` em `1e12242` (Vitor), mantendo
+a autenticação JWT. `solicitante` é obtido da sessão; listagem/detalhe expõem
+somente pedidos do usuário. O consumidor continua exigindo JWT **e** a chave
+`X-VettiFlow-Consumer-Key`; a chave isolada não libera acesso.
+`VF_QUEUE_ENABLED` libera criação de pedidos; `VF_QUEUE_EXECUTION_ENABLED`
+controla separadamente o consumidor e permanece false até homologação.
+O ADVPL original ainda precisa obter/enviar o JWT e ser compilado no DEV.
+A tela Integração Protheus → ícone de nuvem consulta a fila central; ela não
+envia automaticamente os rascunhos locais. Nenhuma escrita ERP foi liberada.

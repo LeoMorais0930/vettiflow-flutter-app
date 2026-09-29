@@ -1,3 +1,4 @@
+import 'api_settings.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'local_json_persistence.dart';
@@ -17,7 +18,7 @@ class SqlProductionRepository {
     this.apiToken = '',
     http.Client? client,
     this.persistence,
-  }) : _client = client ?? http.Client() {
+  }) : _client = client ?? ApiSettings.createClient() {
     try {
       final raw = persistence?.read();
       if (raw != null && raw.isNotEmpty) {

@@ -43,6 +43,7 @@ void main() {
           );
           expect(request.url.queryParameters['filial'], '04');
           expect(request.url.queryParameters['quantidade'], '50');
+          expect(request.url.queryParameters['armazem'], '10');
           expect(request.headers['X-API-Token'], 'token-teste');
           return http.Response(jsonEncode(_previewJson()), 200);
         }),
@@ -52,6 +53,7 @@ void main() {
         '01621401001',
         filial: '04',
         quantidade: 50,
+        armazem: '10',
       );
 
       expect(snapshot.movimentosPrevistos.first.cf, 'PR0');
@@ -59,56 +61,98 @@ void main() {
     },
   );
 
-  testWidgets('OP detail shows official completion preview read-only', (
-    tester,
-  ) async {
-    final op = OrdemProducao(
-      numero: '01621401001',
-      produto: '575-0863 - SMART ALARM',
-      qtd: 50,
-      responsavel: 'Tatiane',
-      dataAbertura: '09/09/2026',
-      prazo: '10/09/2026',
-      status: StatusOP.emAndamento,
-      progresso: 60,
-      mes: 'set',
-      stage: ProductionStage.closing,
-      armazem: '05',
-    );
+  for (final width in [390.0, 1280.0]) {
+    testWidgets(
+      'OP detail at $width shows official completion preview read-only',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final op = OrdemProducao(
+          numero: '01621401001',
+          produto: '575-0863 - SMART ALARM',
+          qtd: 50,
+          responsavel: 'Tatiane',
+          dataAbertura: '09/09/2026',
+          prazo: '10/09/2026',
+          status: StatusOP.emAndamento,
+          progresso: 60,
+          mes: 'set',
+          stage: ProductionStage.closing,
+          armazem: '05',
+          erpReadOnly: true,
+        );
 
-    await tester.pumpWidget(
-      Provider<ProtheusCompletionPreviewRepository>.value(
-        value: _FakeCompletionPreviewRepository(
-          ProtheusCompletionPreviewSnapshot.fromJson(_previewJson()),
-        ),
-        child: MaterialApp(
-          theme: AppTheme.light,
-          home: Scaffold(
-            body: OpDetailPanel(
-              op: op,
-              confirmCancel: false,
-              isDesktop: false,
-              onClose: () {},
-              onAdvance: ({int quantidadeArmazenada = 0}) {},
-              onRegress: () {},
-              onAskCancel: () {},
-              onConfirmCancel: (_, _) {},
-              onCancelNo: () {},
+        final fixture = _previewJson();
+        (fixture['movimentosPrevistos'] as List).add({
+          'cf': 'RE1',
+          'tm': '999',
+          'produto': 'MOD001',
+          'produtoDescricao': 'Mão de obra',
+          'local': '05',
+          'quantidade': 50,
+          'documentoReferencia': '',
+        });
+        final repository = _FakeCompletionPreviewRepository(
+          ProtheusCompletionPreviewSnapshot.fromJson(fixture),
+        );
+        await tester.pumpWidget(
+          Provider<ProtheusCompletionPreviewRepository>.value(
+            value: repository,
+            child: MaterialApp(
+              theme: AppTheme.light,
+              home: Scaffold(
+                body: OpDetailPanel(
+                  op: op,
+                  confirmCancel: false,
+                  isDesktop: width >= 920,
+                  canEdit: false,
+                  onClose: () {},
+                  onAdvance: ({int quantidadeArmazenada = 0}) {},
+                  onRegress: () {},
+                  onAskCancel: () {},
+                  onConfirmCancel: (_, _) {},
+                  onCancelNo: () {},
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-    expect(find.text('PREVIA DE APONTAMENTO PROTHEUS'), findsOneWidget);
-    expect(find.text('Somente leitura'), findsWidgets);
-    expect(find.text('PR0/001'), findsOneWidget);
-    expect(find.text('RE1/999'), findsOneWidget);
-    expect(find.textContaining('Local 10'), findsOneWidget);
-    expect(find.textContaining('Local 05'), findsOneWidget);
-    expect(find.textContaining('Confirmar rotina oficial'), findsWidgets);
-  });
+        expect(repository.armazens, isEmpty);
+        await tester.ensureVisible(
+          find.text('Prévia de apontamento e materiais'),
+        );
+        await tester.tap(find.text('Prévia de apontamento e materiais'));
+        await tester.pumpAndSettle();
+        expect(find.text('PREVIA DE APONTAMENTO PROTHEUS'), findsOneWidget);
+        expect(find.text('Somente leitura'), findsWidgets);
+        expect(find.text('PR0/001'), findsOneWidget);
+        expect(find.text('RE1/999'), findsOneWidget);
+        expect(find.textContaining('Local 10'), findsOneWidget);
+        expect(find.textContaining('Local 05'), findsOneWidget);
+        expect(find.text('Detalhes técnicos da integração'), findsOneWidget);
+
+        // Armazem do acabado vem sugerido e aceita edicao, como na MATA250.
+        final campo = find.byKey(const ValueKey('completion-preview-armazem'));
+        expect(tester.widget<TextField>(campo).controller!.text, '05');
+        expect(find.text('Sugerido pelo Protheus: 05'), findsOneWidget);
+        await tester.enterText(campo, '10');
+        await tester.ensureVisible(find.text('Simular'));
+        await tester.tap(find.text('Simular'));
+        await tester.pumpAndSettle();
+        expect(repository.armazens, [null, '10']);
+        expect(find.textContaining('RE1 · MOD001'), findsNothing);
+        await tester.ensureVisible(find.text('Mostrar MOD (mão de obra)'));
+        await tester.tap(find.text('Mostrar MOD (mão de obra)'));
+        await tester.pumpAndSettle();
+        expect(find.text('MOD · MÃO DE OBRA'), findsOneWidget);
+        expect(find.textContaining('MOD001'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
 
 Map<String, Object?> _previewJson() => {
@@ -119,6 +163,7 @@ Map<String, Object?> _previewJson() => {
   'rotinasCandidatas': ['MATA250', 'MATA680', 'MATA681'],
   'quantidadeSolicitada': 50,
   'quantidadeRestante': 50,
+  'armazemPadrao': '05',
   'ordem': {
     'numero': '01621401001',
     'produto': '575-0863',
@@ -164,19 +209,22 @@ Map<String, Object?> _previewJson() => {
 
 class _FakeCompletionPreviewRepository
     implements ProtheusCompletionPreviewRepository {
-  const _FakeCompletionPreviewRepository(this.snapshot);
+  _FakeCompletionPreviewRepository(this.snapshot);
 
   final ProtheusCompletionPreviewSnapshot snapshot;
+  final List<String?> armazens = [];
 
   @override
   Future<ProtheusCompletionPreviewSnapshot> fetchPreview(
     String op, {
     String filial = '04',
     num? quantidade,
+    String? armazem,
   }) async {
     expect(op, '01621401001');
     expect(filial, '04');
     expect(quantidade, 50);
+    armazens.add(armazem);
     return snapshot;
   }
 }

@@ -68,7 +68,7 @@ class ProtheusSyncClient {
     required this.baseUrl,
     this.apiToken = '',
     http.Client? httpClient,
-  }) : _http = httpClient ?? http.Client();
+  }) : _http = httpClient ?? ApiSettings.createClient();
 
   final String baseUrl;
   final String apiToken;

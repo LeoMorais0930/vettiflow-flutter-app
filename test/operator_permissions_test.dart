@@ -216,6 +216,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       final selector = find.byKey(const Key('mobile-operator-selector'));
+      await tester.tap(find.text('Atribuição local e solicitações'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(selector);
       await tester.tap(selector);
       await tester.pumpAndSettle();

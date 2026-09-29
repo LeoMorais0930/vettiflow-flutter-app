@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vetti_flow_1_0/data/repositories/protheus_auth_session.dart';
 import 'package:provider/provider.dart';
 import 'package:vetti_flow_1_0/data/repositories/operator_assignment_store.dart';
 import 'package:vetti_flow_1_0/shared/models/operator_access.dart';
@@ -59,6 +60,7 @@ class AccountMenu extends StatelessWidget {
       onSelected: (value) {
         if (value == 'logout') {
           store?.logout();
+          context.read<ProtheusAuthSession?>()?.logout();
           Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
         } else if (value == 'environment') {
           showDialog<void>(

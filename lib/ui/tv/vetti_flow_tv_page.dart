@@ -1,3 +1,4 @@
+import 'package:vetti_flow_1_0/data/repositories/api_settings.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -242,8 +243,10 @@ class _TvHeader extends StatelessWidget {
           SizedBox(width: 14 * scale),
           IconButton(
             tooltip: 'Sair',
-            onPressed: () =>
-                Navigator.of(context).pushReplacementNamed('/login'),
+            onPressed: () {
+              ApiSettings.session.logout();
+              Navigator.of(context).pushReplacementNamed('/login');
+            },
             icon: Icon(
               Icons.logout_rounded,
               color: Colors.white70,

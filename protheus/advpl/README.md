@@ -1,96 +1,36 @@
 # Fontes ADVPL do VettiFlow
 
-Consumidores da fila de solicitações da API (`api/app/solicitacoes.py`). A API
-nunca grava no Protheus: ela guarda o pedido, entrega a um consumidor com reserva
-exclusiva e confere o resultado por SELECT. Quem grava é a rotina oficial,
-chamada por estes fontes via ExecAuto.
+**Preparados para compilação e homologação no DEV. Não compilados nesta entrega.**
 
-**Estado: escrito, não compilado nem homologado.** Nada aqui foi executado no RPO.
-
-| Fonte | Operação | Rotina | Modo |
-| --- | --- | --- | --- |
-| `VFFILA01.prw` | `abertura_op` | MATA650 | Opção de menu, um pedido por vez, com confirmação |
-
-## Fluxo do `U_VFFILA01`
-
-1. Confere o ambiente logado (grupo 01, filial 04).
-2. `GET /consumidor/pendentes`: só consulta, nada é reservado.
-3. Mostra cada pedido; o usuário confirma um.
-4. `POST /consumidor/solicitacoes/{id}/reservar`: reserva exclusiva.
-5. `VFAbreOP`: MATA650 por ExecAuto dentro de `Begin Transaction`, sem nenhuma tela.
-6. `POST /consumidor/solicitacoes/{id}/resultado`, com até 3 tentativas. Se o
-   retorno falhar, o fonte **não executa de novo**: mostra a referência para
-   conferência manual.
-7. A API confere a OP na SC2/SD4 e marca `aplicada`, ou `incerta` se divergir.
-
-Como o resultado é classificado:
-
-| Situação | Enviado | Estado na fila |
+| Fonte | Função | Responsabilidade |
 | --- | --- | --- |
-| MATA650 ok e OP achada na SC2 | `sucesso=true`, refs | `aguardando_conferencia` → `aplicada` |
-| MATA650 recusou e a OP **não** existe após o rollback | `semEfeito=true` | `rejeitada` |
-| MATA650 recusou e a OP existe | `semEfeito=false` | `incerta` |
-| Exceção no meio da rotina | `semEfeito=false` | `incerta` |
+| `VFFILA01.prw` | `U_VFFILA01(cSessionToken)` | Autentica, lista/reserva pedidos, abre OP pela MATA650 e devolve resultados |
+| `VFEMP01.prw` | `U_VFEMP01(oPed)` | Executor interno: exclusão seletiva de empenhos pela MATA381 |
 
-## Configuração
+Compilar os dois arquivos no mesmo RPO. Somente `U_VFFILA01` deve ser opção de
+menu, restrita aos executores autorizados. `U_VFEMP01` não é uma tela de menu.
 
-No `appserver.ini` do ambiente DEV (fora do SX6, para a chave não aparecer no
-configurador):
+A criação usa `GERAOPI="N"`, `GERASC="N"`, `GERAEMP="S"` e `AUTEXPLODE="S"`:
+somente a OP solicitada, sem gerar intermediárias, mantendo seus empenhos.
+A exclusão usa MATA381 em alteração (4), com LINPOS e AUTDELETA por linha.
+A API não escreve nas tabelas do ERP.
 
-```ini
-[VETTIFLOW]
-Url=http://servidor-da-api:8000/api/v1
-ConsumerKey=<VF_QUEUE_CONSUMER_TOKEN da API>
-ApiToken=<VF_API_TOKEN da API, se configurado>
-```
+O menu exige o JWT do mesmo usuário logado no Protheus e as chaves da API e do
+consumidor. Não há dispensa de JWT nem impersonação do usuário do Flutter. O
+JWT temporário pode ser fornecido pelo parâmetro ou `SessionToken` do ini DEV.
+É preciso renovar manualmente o login quando expirar durante esta homologação.
 
-Na API (`api/.env`): `VF_QUEUE_ENABLED=true`, `VF_QUEUE_CONSUMER_TOKEN=<chave aleatória>`.
-Ver `api/.env.example`.
+Configuração completa, limites e passos de validação estão em
+[Revisão de empenhos](HOMOLOGACAO.md).
 
-Menu: cadastrar `U_VFFILA01` no módulo de PCP pelo configurador, só para os
-usuários que vão processar a fila.
+## Pendências do RPO
 
-## Roteiro do primeiro teste no DEV
+- Compilar os dois fontes com os includes instalados no DEV.
+- Confirmar MATA650/numeração SX8, geração de SD4 sem intermediárias/SCs.
+- Validar pontos Vetti MTA650I/A650LEMP e quaisquer efeitos de tela não chamados por ExecAuto.
+- Validar MATA381/LINPOS, lotes/endereço, permissões e atualização de saldos.
+- Validar locks, rollback, concorrência e resultado perdido.
+- Processamento automático contínuo exige uma etapa posterior; o consumidor atual é de menu.
 
-1. Criar um pedido pela API (troque o `id` a cada pedido novo):
-
-   ```bash
-   curl -X POST http://localhost:8000/api/v1/solicitacoes \
-     -H 'Content-Type: application/json' \
-     -d '{"id":"6f1c2b9e-0000-4000-8000-000000000001","versaoContrato":"vettiflow.solicitacao.v1","operacao":"abertura_op","solicitante":"teste","payload":{"produto":"575-0863","quantidade":10,"armazem":"05","dataInicio":"2026-09-29","dataEntrega":"2026-09-30"}}'
-   ```
-
-2. No Protheus DEV, rodar `U_VFFILA01` e confirmar o pedido.
-3. Conferir o estado: `GET /api/v1/solicitacoes/{id}` (traz o histórico e o log).
-4. Comparar SC2 e SD4 da OP gerada com uma abertura manual equivalente, feita
-   pela tela, no mesmo dia.
-
-## Pendências antes de homologar
-
-- [ ] Compilar no RPO do DEV (quem tem acesso ainda não está confirmado).
-- [ ] `AUTEXPLODE="S"`: confirmar que gera a SD4 e as intermediárias como a tela.
-- [ ] `GetSXENum("SC2","C2_NUM")` + `ConfirmSX8`/`RollBackSX8`: confirmar que é
-      como a Vetti numera OP (a tela pode usar outro inicializador).
-- [ ] Confirmar que `MTA650I` (`C2_VOP`/`C2_VGRU`) e `A650LEMP` disparam pelo
-      ExecAuto. Pontos só de tela (ex. `MTA650GEM`) não disparam.
-- [ ] Validar o `ErrorBlock` + `Begin Transaction`: se uma exceção deixa a
-      transação desfeita. Até lá, exceção é tratada como `incerta`.
-- [ ] Autorização por solicitante: hoje quem confirma no menu é o usuário
-      logado, e o nome do solicitante vem do app sem validação.
-- [ ] `C2_OBS` recebe `VF:<8 primeiros do id>` para conferência manual. É
-      provisório até existir um campo próprio (`C2_XVFID`), gravado na mesma
-      transação.
-- [ ] Testes do plano: sucesso, rejeição, mesmo id repetido, queda antes do retorno.
-
-
-## Integração com o login JWT atual
-
-A API agora exige Bearer JWT em todas as rotas de negócio, incluindo consumidor.
-Este fonte original envia somente ConsumerKey/ApiToken: **ainda não é compatível
-para execução** sem implementar obtenção/renovação de JWT pelo consumidor.
-Não isentar estas rotas de autenticação. O solicitante agora vem da sessão API,
-não do nome enviado no JSON. O executor continua sendo o usuário logado no menu;
-isso não executa automaticamente com a identidade do solicitante Flutter.
-`VF_QUEUE_EXECUTION_ENABLED=false` bloqueia o consumidor até homologação.
-O cadastro de pedidos e a consulta de resultados já podem ser testados na API
-com JWT; o envio real e a compilação no RPO não foram realizados.
+Se a resposta à API falhar, o consumidor reenvia somente o resultado, nunca
+repete o ExecAuto. A reserva vencida fica incerta e exige conferência manual.

@@ -1,3 +1,4 @@
+import 'package:vetti_flow_1_0/ui/protheus/commitment_review_page.dart';
 import 'package:vetti_flow_1_0/shared/models/operator_access.dart';
 import 'package:flutter/material.dart';
 import 'widgets/sector_shortcuts.dart';
@@ -64,11 +65,22 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     return BlocListener<DashboardCubit, DashboardState>(
       listenWhen: (antes, agora) =>
-          antes.protheusAviso != agora.protheusAviso &&
-          agora.protheusAviso.isNotEmpty,
+          (antes.protheusAviso != agora.protheusAviso &&
+              agora.protheusAviso.isNotEmpty) ||
+          (antes.revisarEmpenhosOp != agora.revisarEmpenhosOp &&
+              agora.revisarEmpenhosOp.isNotEmpty),
       listener: (context, state) {
-        _avisarProtheusForaDoAr(context, state.protheusAviso);
-        context.read<DashboardCubit>().limparAvisoProtheus();
+        if (state.protheusAviso.isNotEmpty) {
+          _avisarProtheusForaDoAr(context, state.protheusAviso);
+          context.read<DashboardCubit>().limparAvisoProtheus();
+        }
+        if (state.revisarEmpenhosOp.isNotEmpty) {
+          final op = state.revisarEmpenhosOp;
+          context.read<DashboardCubit>().consumirRevisaoEmpenhos();
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => CommitmentReviewPage(op: op)),
+          );
+        }
       },
       child: Scaffold(
         backgroundColor: AppColors.background,

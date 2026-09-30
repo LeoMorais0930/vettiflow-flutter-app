@@ -279,6 +279,9 @@ class DashboardCubit extends Cubit<DashboardState> {
           novaOPOpen: false,
           databaseSyncing: false,
           databaseSyncMessage: '',
+          revisarEmpenhosOp: envio?.gravouNoProtheus == true
+              ? (envio?.protheusRef ?? '')
+              : '',
           protheusAviso: envio == null || envio.gravouNoProtheus
               ? ''
               : '${criada.numero}: ${envio.aviso}',
@@ -292,6 +295,8 @@ class DashboardCubit extends Cubit<DashboardState> {
 
   /// Some com o aviso depois que a tela ja mostrou, para nao repetir a cada
   /// rebuild.
+  void consumirRevisaoEmpenhos() => emit(state.copyWith(revisarEmpenhosOp: ''));
+
   void limparAvisoProtheus() {
     if (state.protheusAviso.isEmpty) return;
     emit(state.copyWith(protheusAviso: ''));

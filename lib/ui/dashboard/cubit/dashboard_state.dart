@@ -25,6 +25,7 @@ class DashboardState {
   /// Aviso de que a ultima OP aberta nao chegou ao Protheus. Vazio = tudo
   /// certo. A tela mostra e limpa com [DashboardCubit.limparAvisoProtheus].
   final String protheusAviso;
+  final String revisarEmpenhosOp;
   final String loadError;
   final String filtroSetor;
   final String filtroSituacao;
@@ -48,6 +49,7 @@ class DashboardState {
     this.databaseSyncing = false,
     this.databaseSyncMessage = '',
     this.protheusAviso = '',
+    this.revisarEmpenhosOp = '',
     this.loadError = '',
     this.filtroSetor = 'todos',
     this.filtroSituacao = 'todas',
@@ -224,6 +226,7 @@ class DashboardState {
     bool? databaseSyncing,
     String? databaseSyncMessage,
     String? protheusAviso,
+    String? revisarEmpenhosOp,
     String? loadError,
     String? filtroSetor,
     String? filtroSituacao,
@@ -247,6 +250,7 @@ class DashboardState {
       databaseSyncing: databaseSyncing ?? this.databaseSyncing,
       databaseSyncMessage: databaseSyncMessage ?? this.databaseSyncMessage,
       protheusAviso: protheusAviso ?? this.protheusAviso,
+      revisarEmpenhosOp: revisarEmpenhosOp ?? this.revisarEmpenhosOp,
       loadError: loadError ?? this.loadError,
       filtroSetor: filtroSetor ?? this.filtroSetor,
       filtroSituacao: filtroSituacao ?? this.filtroSituacao,

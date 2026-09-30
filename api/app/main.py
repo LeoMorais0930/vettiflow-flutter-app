@@ -19,6 +19,7 @@ from .warehouse_reports import router as warehouse_reports_router
 from .protheus_auth import router as protheus_auth_router
 from .solicitacoes import router as solicitacoes_router
 from .flow_tracking import router as flow_tracking_router
+from .commitment_review import router as commitment_review_router
 
 log = logging.getLogger("vetti_flow_api")
 
@@ -50,6 +51,7 @@ app.include_router(warehouse_writes.router)
 app.include_router(sql_production_router)
 app.include_router(solicitacoes_router)
 app.include_router(flow_tracking_router)
+app.include_router(commitment_review_router)
 
 
 def secured_openapi():

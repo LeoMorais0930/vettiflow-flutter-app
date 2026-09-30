@@ -3,7 +3,7 @@
 /*/{Protheus.doc} VFFILA01
 Consumidor da fila de solicitacoes do VettiFlow - opcao de menu.
 
-Primeiro incremento do plano ADVPL (28/09/2026): abertura de OP (MATA650).
+Operacoes: abertura de OP (MATA650) e exclusao seletiva (U_VFEMP01/MATA381).
 Fluxo: lista os pedidos pendentes na API do VettiFlow, mostra um por vez,
 e so depois da confirmacao do usuario reserva o pedido, executa a MATA650
 e devolve o resultado. A API confere a OP por SELECT antes de marcar
@@ -17,6 +17,7 @@ ficar visivel no configurador):
     Url=http://servidor-da-api:8000/api/v1
     ConsumerKey=<VF_QUEUE_CONSUMER_TOKEN da API>
     ApiToken=<VF_API_TOKEN da API, se configurado>
+    SessionToken=<JWT temporario do mesmo usuario do menu, somente DEV>
 
 NAO COMPILADO/HOMOLOGADO. Pendencias em protheus/advpl/README.md.
 @type  User Function
@@ -24,14 +25,15 @@ NAO COMPILADO/HOMOLOGADO. Pendencias em protheus/advpl/README.md.
 Static cVFUrl := ""
 Static cVFKey := ""
 Static cVFTok := ""
+Static cVFJwt := ""
 
-User Function VFFILA01()
+User Function VFFILA01(cSessionToken)
     Local aPend    := {}
     Local nI       := 0
     Local oPed     := Nil
     Local cResumo  := ""
 
-    If !VFConfig()
+    If !VFConfig(cSessionToken)
         Return
     EndIf
 
@@ -41,6 +43,9 @@ User Function VFFILA01()
         Return
     EndIf
 
+    If !VFAuth()
+        Return
+    EndIf
     aPend := VFPendentes()
     If aPend == Nil
         Return
@@ -62,8 +67,22 @@ User Function VFFILA01()
 Return
 
 /*/ Le a configuracao do appserver.ini. /*/
-Static Function VFConfig()
+Static Function VFConfig(cSessionToken)
     Local cIni := GetAdv97()
+    Local cEnv := Upper(AllTrim(GetEnvServer()))
+
+    If cEnv != "P12DEV" .And. cEnv != "P12REST"
+        MsgStop("Consumidor liberado somente para P12DEV/P12REST nesta homologacao.", "VettiFlow")
+        Return .F.
+    EndIf
+    cVFJwt := IIf(ValType(cSessionToken) == "C", cSessionToken, "")
+    If Empty(cVFJwt)
+        cVFJwt := AllTrim(GetPvProfString("VETTIFLOW", "SessionToken", "", cIni))
+    EndIf
+    If Empty(cVFJwt)
+        MsgStop("Informe um JWT ativo do VettiFlow no parametro de U_VFFILA01 ou SessionToken no ini DEV.", "VettiFlow")
+        Return .F.
+    EndIf
 
     cVFUrl := AllTrim(GetPvProfString("VETTIFLOW", "Url", "", cIni))
     cVFKey := AllTrim(GetPvProfString("VETTIFLOW", "ConsumerKey", "", cIni))
@@ -85,6 +104,7 @@ Static Function VFHttp(cMetodo, cPath, cBody, nStatus)
 
     aAdd(aHead, "Content-Type: application/json")
     aAdd(aHead, "Accept: application/json")
+    aAdd(aHead, "Authorization: Bearer " + cVFJwt)
     aAdd(aHead, "X-VettiFlow-Consumer-Key: " + cVFKey)
     If !Empty(cVFTok)
         aAdd(aHead, "X-API-Token: " + cVFTok)
@@ -126,6 +146,25 @@ Static Function VFJson(cTexto, lArray)
     EndIf
 Return oJson
 
+// JWT deve pertencer ao mesmo usuario que executa no menu do Protheus.
+Static Function VFAuth()
+    Local nStatus := 0
+    Local oSessao := Nil
+    Local cResp := VFHttp("GET", "/auth/protheus/session", "", @nStatus)
+    If nStatus != 200
+        MsgStop("Sessao VettiFlow ausente ou expirada. Renove o login e o JWT antes de executar.", "VettiFlow")
+        Return .F.
+    EndIf
+    oSessao := VFJson(cResp, .F.)
+    If oSessao == Nil
+        Return .F.
+    EndIf
+    If Lower(AllTrim(oSessao["username"])) != Lower(AllTrim(UsrRetName(RetCodUsr())))
+        MsgStop("O JWT deve ser do usuario logado neste Protheus.", "VettiFlow")
+        Return .F.
+    EndIf
+Return .T.
+
 Static Function VFPendentes()
     Local nStatus := 0
     Local cResp   := VFHttp("GET", "/consumidor/pendentes", "", @nStatus)
@@ -145,6 +184,23 @@ Return oLista["itens"]
 
 Static Function VFResumo(oPed)
     Local oPay := oPed["payload"]
+    Local cItens := ""
+    Local nI := 0
+    Local nPos := 0
+    Local oRow := Nil
+    If oPed["operacao"] == "exclusao_empenhos"
+        For nI := 1 To Len(oPay["excluded"])
+            nPos := aScan(oPay["snapshot"]["items"], {|r| r["id"] == oPay["excluded"][nI]["id"]})
+            If nPos > 0
+                oRow := oPay["snapshot"]["items"][nPos]
+                cItens += oRow["produto"] + " / arm. " + oRow["local"] + " / qtd. " + ;
+                          cValToChar(oRow["quantidade"]) + " - " + oPay["excluded"][nI]["reason"] + CRLF
+            EndIf
+        Next nI
+        Return "Pedido " + Left(oPed["id"], 8) + " de " + oPed["solicitante"] + CRLF + ;
+               "EXCLUIR " + cValToChar(Len(oPay["excluded"])) + " empenho(s) da OP " + oPay["op"] + CRLF + ;
+               cItens + "Os demais empenhos e os itens MOD serao mantidos."
+    EndIf
 Return "Pedido " + Left(oPed["id"], 8) + " de " + oPed["solicitante"] + CRLF + ;
        "Operacao: " + oPed["operacao"] + CRLF + ;
        "Produto: " + oPay["produto"] + CRLF + ;
@@ -162,6 +218,9 @@ Static Function VFProcessa(cId)
     Local nTent    := 0
     Local lEnviado := .F.
 
+    If !VFAuth()
+        Return
+    EndIf
     cResp := VFHttp("POST", "/consumidor/solicitacoes/" + cId + "/reservar", "{}", @nStatus)
     If nStatus != 200
         MsgStop("Nao foi possivel reservar o pedido (" + cValToChar(nStatus) + "). " + ;
@@ -175,10 +234,14 @@ Static Function VFProcessa(cId)
                 "aparecer como incerto na fila.", "VettiFlow")
         Return
     EndIf
-    If oPed["empresa"] != "01" .Or. oPed["filial"] != "04" .Or. oPed["operacao"] != "abertura_op"
+    If oPed["empresa"] != "01" .Or. oPed["filial"] != "04"
         aRes := {.F., .T., {}, "Pedido fora do escopo deste consumidor.", ""}
-    Else
+    ElseIf oPed["operacao"] == "abertura_op"
         aRes := VFAbreOP(oPed)
+    ElseIf oPed["operacao"] == "exclusao_empenhos"
+        aRes := U_VFEMP01(oPed)
+    Else
+        aRes := {.F., .T., {}, "Operacao nao suportada por este consumidor.", ""}
     EndIf
 
     cCorpo := VFCorpoResultado(oPed["reserva"], aRes)
@@ -257,7 +320,10 @@ Static Function VFAbreOP(oPed)
     aAdd(aCab, {"C2_DATPRI" , SToD(StrTran(oPay["dataInicio"], "-", "")) , Nil})
     aAdd(aCab, {"C2_DATPRF" , SToD(StrTran(oPay["dataEntrega"], "-", "")), Nil})
     aAdd(aCab, {"C2_OBS"    , cObs                               , Nil})
-    // Gera empenhos (SD4) e OPs intermediarias pela estrutura. Confirmar no DEV.
+    // Gera somente empenhos da OP solicitada; nunca abre OPs intermediarias ou SCs.
+    aAdd(aCab, {"GERAOPI", "N", Nil})
+    aAdd(aCab, {"GERASC", "N", Nil})
+    aAdd(aCab, {"GERAEMP", "S", Nil})
     aAdd(aCab, {"AUTEXPLODE", "S"                                , Nil})
 
     bErroAnt := ErrorBlock({|oErr| cFalha := oErr:Description, Break(oErr)})
@@ -313,17 +379,18 @@ Static Function VFExisteOP(cNum)
     RestArea(aArea)
 Return lAchou
 
-/*/ OP pedida primeiro (item 01, sequencia 001), depois as intermediarias. /*/
+/*/ Retorna somente a OP solicitada, item 01 e sequencia 001. /*/
 Static Function VFRefsOP(cNum)
     Local aArea := SC2->(GetArea())
     Local aRefs := {}
 
     SC2->(DbSetOrder(1))
-    If SC2->(DbSeek(xFilial("SC2") + cNum))
-        While !SC2->(Eof()) .And. SC2->C2_FILIAL == xFilial("SC2") .And. SC2->C2_NUM == cNum
+    If SC2->(DbSeek(xFilial("SC2") + cNum + "01" + "001"))
+        If SC2->C2_FILIAL == xFilial("SC2") .And. SC2->C2_NUM == cNum .And. ;
+           SC2->C2_ITEM == "01" .And. SC2->C2_SEQUEN == "001" .And. ;
+           Empty(SC2->C2_ITEMGRD) .And. !SC2->(Deleted())
             aAdd(aRefs, AllTrim(SC2->C2_NUM) + AllTrim(SC2->C2_ITEM) + AllTrim(SC2->C2_SEQUEN))
-            SC2->(DbSkip())
-        EndDo
+        EndIf
     EndIf
     RestArea(aArea)
 Return aRefs

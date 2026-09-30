@@ -1,3 +1,4 @@
+import 'package:vetti_flow_1_0/ui/protheus/commitment_review_page.dart';
 import 'flow_tracking_card.dart';
 import 'package:vetti_flow_1_0/data/models/dashboard_order_groups.dart';
 import 'package:flutter/material.dart';
@@ -293,6 +294,22 @@ class _DetailContentState extends State<_DetailContent> {
                     child: Column(
                       children: [
                         _InfoCard(op: op, resp: resp),
+                        if (op.erpKey != null && !op.encerradaNoErp)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: OutlinedButton.icon(
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => CommitmentReviewPage(
+                                    op: op.numero,
+                                    filial: op.erpKey!['filial'] ?? '04',
+                                  ),
+                                ),
+                              ),
+                              icon: const Icon(Icons.checklist),
+                              label: const Text('Revisar empenhos da OP'),
+                            ),
+                          ),
                         SizedBox(height: showBackArrow ? 18 : 24),
                         SwitchListTile.adaptive(
                           contentPadding: EdgeInsets.zero,

@@ -69,7 +69,7 @@ WRITE_LEDGER = Path(os.getenv(
 # Nada é gravado no ERP por aqui: a API só guarda o pedido e lê para conferir.
 QUEUE_ENABLED = os.getenv("VF_QUEUE_ENABLED", "false").lower() == "true"
 QUEUE_EXECUTION_ENABLED = os.getenv("VF_QUEUE_EXECUTION_ENABLED", "false").lower() == "true"
-QUEUE_OPERATIONS = _csv_env("VF_QUEUE_OPERATIONS", ["abertura_op"])
+QUEUE_OPERATIONS = _csv_env("VF_QUEUE_OPERATIONS", ["abertura_op", "exclusao_empenhos"])
 QUEUE_CONSUMER_TOKEN = os.getenv("VF_QUEUE_CONSUMER_TOKEN", "").strip()
 QUEUE_RESERVATION_MINUTES = int(os.getenv("VF_QUEUE_RESERVATION_MINUTES", "10"))
 QUEUE_DB = Path(

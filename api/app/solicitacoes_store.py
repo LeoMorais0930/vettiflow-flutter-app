@@ -108,6 +108,10 @@ class SolicitacaoStore(ABC):
     def listar(self, status: str | None = None, limit: int = 50) -> list[Solicitacao]: ...
 
     @abstractmethod
+    def revisao_empenhos(self, scope: str, op: str, actor: str | None = None,
+                        somente_ativas: bool = False) -> Solicitacao | None: ...
+
+    @abstractmethod
     def reservar(self, operacoes: list[str], minutos: int) -> Solicitacao | None:
         """Passa a mais antiga `pendente` para `processando`, atomicamente."""
 
@@ -242,6 +246,16 @@ class SqliteSolicitacaoStore(SolicitacaoStore):
                         "Este id já foi usado com outro conteúdo. Consulte a solicitação"
                         " original antes de criar outra.")
                 return existente, False
+            if nova.operacao == "exclusao_empenhos":
+                bloqueio = conn.execute(
+                    "SELECT id FROM solicitacoes WHERE operacao=? AND empresa=? AND filial=?"
+                    " AND json_extract(payload, '$.scope')=? AND json_extract(payload, '$.op')=?"
+                    " AND (status IN ('pendente','processando','aguardando_conferencia','incerta')"
+                    " OR (status='aplicada' AND json_extract(payload, '$.fingerprint')=?)) LIMIT 1",
+                    (nova.operacao, nova.empresa, nova.filial, nova.payload['scope'],
+                     nova.payload['op'], nova.payload['fingerprint'])).fetchone()
+                if bloqueio:
+                    raise ConflitoError('Já existe uma revisão enviada para esta OP. Confira seu resultado antes de reenviar.')
             agora = _iso(_agora())
             conn.execute(
                 "INSERT INTO solicitacoes (id, versao_contrato, operacao, empresa, filial,"
@@ -266,6 +280,20 @@ class SqliteSolicitacaoStore(SolicitacaoStore):
         sql += " ORDER BY criado_em DESC LIMIT ?"
         with self._conexao() as conn:
             return [self._linha(r) for r in conn.execute(sql, (*params, limit))]
+
+    def revisao_empenhos(self, scope: str, op: str, actor: str | None = None,
+                        somente_ativas: bool = False) -> Solicitacao | None:
+        sql = ("SELECT * FROM solicitacoes WHERE operacao='exclusao_empenhos'"
+               " AND json_extract(payload, '$.scope')=? AND json_extract(payload, '$.op')=?")
+        args = [scope, op]
+        if actor is not None:
+            sql += " AND solicitante=?"
+            args.append(actor)
+        if somente_ativas:
+            sql += " AND status IN ('pendente','processando','aguardando_conferencia','incerta')"
+        sql += " ORDER BY criado_em DESC, rowid DESC LIMIT 1"
+        with self._conexao() as conn:
+            return self._linha(conn.execute(sql, args).fetchone())
 
     def reservar(self, operacoes: list[str], minutos: int) -> Solicitacao | None:
         if not operacoes:

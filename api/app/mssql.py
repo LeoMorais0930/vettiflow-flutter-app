@@ -1251,3 +1251,30 @@ def _date_br(value: Any) -> str | None:
     if len(raw) != 8:
         return None
     return f"{raw[6:8]}/{raw[4:6]}/{raw[0:4]}"
+
+
+def commitment_review_snapshot(op: str, filial: str) -> dict:
+    """SELECT de linhas individuais SD4; não agrega produto/local nem escreve ERP."""
+    with conexao() as conn:
+        order = _official_order(conn, op, filial)
+        if not order or order['numero'] != op:
+            return {'order': None, 'items': []}
+        items = _fetchall(conn, f"""
+            SELECT d.R_E_C_N_O_ AS id, LTRIM(RTRIM(d.D4_COD)) AS produto,
+                   LTRIM(RTRIM(d.D4_LOCAL)) AS local, d.D4_QUANT AS quantidade,
+                   d.D4_QTDEORI AS quantidadeOriginal,
+                   RTRIM(d.D4_TRT) AS tratamento, RTRIM(d.D4_LOTECTL) AS loteControle,
+                   RTRIM(d.D4_NUMLOTE) AS numeroLote, RTRIM(d.D4_OPORIG) AS opOrigem,
+                   RTRIM(d.D4_SEQ) AS sequencia,
+                   COALESCE(p.descricao, '') AS descricao, COALESCE(p.unidade, '') AS unidade
+            FROM {tabela('SD4')} d
+            OUTER APPLY (SELECT TOP (1) LTRIM(RTRIM(b.B1_DESC)) AS descricao,
+                         LTRIM(RTRIM(b.B1_UM)) AS unidade
+                         FROM {tabela('SB1')} b
+                         WHERE b.D_E_L_E_T_ <> '*' AND b.B1_COD = d.D4_COD
+                         AND (RTRIM(b.B1_FILIAL) = ? OR RTRIM(b.B1_FILIAL) = '')
+                         ORDER BY b.B1_FILIAL DESC) p
+            WHERE d.D_E_L_E_T_ <> '*' AND d.D4_FILIAL = ? AND RTRIM(d.D4_OP) = ?
+            ORDER BY d.R_E_C_N_O_
+        """, (filial, filial, op))
+    return {'order': order, 'items': items}

@@ -157,7 +157,7 @@ def conferir_abertura(item: Solicitacao) -> tuple[bool, str]:
     """Confere por SELECT a OP que o consumidor informou.
 
     `protheusRefs[0]` é a OP do produto pedido (C2_NUM+C2_ITEM+C2_SEQUEN);
-    as demais, se houver, são intermediárias.
+    o consumidor atual deve retornar somente a OP solicitada, sem intermediárias.
     """
     referencia = item.protheus_refs[0] if item.protheus_refs else ""
     pedido = item.payload
@@ -188,7 +188,28 @@ def conferir_abertura(item: Solicitacao) -> tuple[bool, str]:
     return True, f"OP {referencia} confirmada na SC2 com {linhas} empenho(s) na SD4."
 
 
-_CONFERENCIAS = {"abertura_op": conferir_abertura}
+def conferir_exclusao_empenhos(item: Solicitacao) -> tuple[bool, str]:
+    pedido = item.payload
+    if item.protheus_refs != [pedido['op']]:
+        return False, 'Referência retornada diverge da OP revisada.'
+    atual = mssql.commitment_review_snapshot(pedido['op'], item.filial)
+    antes = pedido['snapshot']
+    campos = ('numero', 'produto', 'emissao', 'quantidadePlanejada', 'quantidadeProduzida', 'local', 'encerrada')
+    if not atual['order'] or any(str(atual['order'].get(c)) != str(antes['order'].get(c)) for c in campos):
+        return False, 'A OP mudou durante a execução. Confira no Protheus.'
+    removidos = {r['id'] for r in pedido['excluded']}
+    esperados = {r['id']: r for r in antes['items'] if r['id'] not in removidos}
+    encontrados = {r['id']: r for r in atual['items']}
+    campos_linha = ('produto','local','quantidade','quantidadeOriginal','tratamento',
+                    'loteControle','numeroLote','opOrigem','sequencia')
+    if set(esperados) != set(encontrados) or any(
+        any(encontrados[id_].get(c) != row.get(c) for c in campos_linha)
+        for id_, row in esperados.items()):
+        return False, 'SD4 diverge da seleção: confira exclusões e empenhos mantidos antes de repetir.'
+    return True, f"Exclusão de {len(removidos)} empenho(s) confirmada; demais linhas preservadas."
+
+
+_CONFERENCIAS = {"abertura_op": conferir_abertura, 'exclusao_empenhos': conferir_exclusao_empenhos}
 
 
 @router.get('/solicitacoes-status')
@@ -300,14 +321,14 @@ def reservar_id(id_: UUID,
 
 
 @router.post("/consumidor/solicitacoes/{id_}/resultado")
-def registrar_resultado(id_: UUID, entrada: ResultadoIn,
+def registrar_resultado(id_: UUID, entrada: ResultadoIn, request: Request,
                         x_vettiflow_consumer_key: str | None = Header(default=None)) -> dict:
     _exigir_consumidor(x_vettiflow_consumer_key)
     try:
         item = store().registrar_resultado(str(id_), entrada.reserva, Resultado(
             sucesso=entrada.sucesso, sem_efeito=entrada.semEfeito,
             protheus_refs=entrada.protheusRefs, mensagem=entrada.mensagem,
-            log_execauto=entrada.logExecauto, executor=entrada.executor))
+            log_execauto=entrada.logExecauto, executor=request.state.protheus_session['username']))
     except NaoEncontradaError:
         raise HTTPException(404, "Solicitação não encontrada.") from None
     except ReservaInvalidaError:

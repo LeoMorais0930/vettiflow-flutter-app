@@ -1,3 +1,4 @@
+import 'commitment_review_page.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:vetti_flow_1_0/data/repositories/api_settings.dart';
@@ -112,12 +113,28 @@ class _SolicitacoesPageState extends State<SolicitacoesPage> {
                           final payload = item['payload'] as Map;
                           return ListTile(
                             title: Text(
-                              '${payload['produto']} · ${payload['quantidade']} un',
+                              item['operacao'] == 'exclusao_empenhos'
+                                  ? 'Empenhos da OP ${payload['op']} · ${(payload['excluded'] as List).length} exclusões'
+                                  : '${payload['produto']} · ${payload['quantidade']} un',
                             ),
                             subtitle: Text(
                               '${item['id']}\n${item['mensagem'] ?? ''}',
                             ),
-                            trailing: Text('${item['status']}'),
+                            trailing:
+                                item['status'] == 'aplicada' &&
+                                    (item['protheusRefs'] as List? ?? [])
+                                        .isNotEmpty
+                                ? TextButton(
+                                    onPressed: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => CommitmentReviewPage(
+                                          op: '${(item['protheusRefs'] as List).first}',
+                                        ),
+                                      ),
+                                    ),
+                                    child: const Text('Revisar empenhos'),
+                                  )
+                                : Text('${item['status']}'),
                           );
                         },
                       ),
